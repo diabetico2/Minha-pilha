@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#08090d">
+  <meta name="description" content="Checklist pessoal de ordens de leitura de quadrinhos.">
+  <title>Minha Pilha — Checklist de Quadrinhos</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="app-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="hierarchy.css">
+  <link rel="stylesheet" href="library-groups.css">
+  <link rel="stylesheet" href="enhancements.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="Minha Pilha — início"><span class="brand-mark">MP</span><span>Minha Pilha</span></a>
+    <div class="top-actions">
+      <span class="save-status" id="saveStatus" title="Seu progresso é salvo automaticamente"><i></i><span>Salvo neste navegador</span></span>
+      <button class="icon-button install-button" id="installBtn" type="button" hidden>Instalar</button>
+      <button class="icon-button" id="exportBtn" title="Salvar uma cópia do progresso">Salvar backup</button>
+      <label class="icon-button" title="Restaurar o progresso de um backup">Restaurar<input id="importInput" type="file" accept="application/json" hidden></label>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <p class="eyebrow">ARQUIVO PESSOAL · SALVO NESTE NAVEGADOR</p>
+      <h1>Sua próxima história<br><em>começa aqui.</em></h1>
+      <p class="hero-copy">Marque o que já leu, guarde exatamente onde parou e retome sem perder o fio.</p>
+      <div class="stats" aria-label="Progresso geral">
+        <div><strong id="totalRead">0</strong><span>lidas</span></div>
+        <div><strong id="totalItems">0</strong><span>itens</span></div>
+        <div><strong id="totalPercent">0%</strong><span>concluído</span></div>
+        <div><strong id="activeCount">0</strong><span>em andamento</span></div>
+      </div>
+      <div class="hero-save-card">
+        <div><span class="save-dot"></span><strong>Arquivo automático</strong><p id="backupSummary">Seu progresso fica salvo enquanto você lê.</p></div>
+        <button id="backupNowBtn" type="button">Fazer backup agora</button>
+      </div>
+    </section>
+
+    <section class="current-section" aria-labelledby="currentTitle">
+      <div class="section-heading shelf-heading">
+        <div><p class="eyebrow">MINHA ESTANTE</p><h2 id="currentTitle">Continue de onde parou</h2><p class="section-copy" id="shelfDescription">Suas ordens ativas, reunidas em um só lugar.</p></div>
+        <div class="shelf-tabs" role="tablist" aria-label="Visualizar estante">
+          <button class="shelf-tab active" type="button" role="tab" data-shelf="current" aria-selected="true">Em andamento <span id="currentShelfCount">0</span></button>
+          <button class="shelf-tab" type="button" role="tab" data-shelf="favorites" aria-selected="false">Favoritas <span id="favoriteShelfCount">0</span></button>
+          <button class="shelf-tab" type="button" role="tab" data-shelf="queue" aria-selected="false">Quero ler <span id="queueShelfCount">0</span></button>
+        </div>
+      </div>
+      <div class="backup-reminder" id="backupReminder" hidden><span><b>Seu progresso está seguro neste navegador.</b> Um backup externo protege contra limpeza de dados ou troca de dispositivo.</span><button id="reminderBackupBtn" type="button">Salvar cópia</button></div>
+      <div id="featuredOrders" class="featured-grid"></div>
+      <div id="shelfEmpty" class="shelf-empty" hidden></div>
+    </section>
+
+    <section class="library" aria-labelledby="libraryTitle">
+      <aside class="sidebar">
+        <p class="eyebrow">BIBLIOTECA</p>
+        <nav id="orderNav" aria-label="Ordens de leitura"></nav>
+      </aside>
+      <div class="content">
+        <div class="section-heading library-heading">
+          <div><p class="eyebrow">ORDEM SELECIONADA</p><h2 id="libraryTitle">Biblioteca</h2></div>
+          <div class="library-progress-actions">
+            <div class="order-collection-actions">
+              <button class="collection-action" id="favoriteOrderBtn" type="button" aria-pressed="false">☆ Favoritar</button>
+              <button class="collection-action" id="queueOrderBtn" type="button" aria-pressed="false">＋ Quero ler</button>
+            </div>
+            <button class="next-unread" id="nextUnreadBtn" type="button">Próxima não lida →</button>
+            <div class="progress-ring" id="orderPercent">0%</div>
+          </div>
+        </div>
+        <div class="toolbar">
+          <label class="search"><span>⌕</span><input id="searchInput" type="search" placeholder="Buscar título ou edição…" autocomplete="off"></label>
+          <label class="era-picker"><span>Era ou fase</span><select id="eraFilter" aria-label="Filtrar por era ou fase"><option value="all">Todas as eras</option></select></label>
+          <div class="filters" role="group" aria-label="Filtrar itens">
+            <button class="filter active" data-filter="all">Todos</button>
+            <button class="filter" data-filter="unread">Não lidos</button>
+            <button class="filter" data-filter="read">Lidos</button>
+          </div>
+        </div>
+        <div id="orderMeta" class="order-meta"></div>
+        <div id="sections"></div>
+        <div id="emptyState" class="empty" hidden>Nenhum item encontrado com este filtro.</div>
+      </div>
+    </section>
+  </main>
+
+  <footer><span>Minha Pilha</span><span>O progresso fica apenas neste dispositivo.</span><button id="resetBtn">Limpar progresso</button></footer>
+  <dialog class="note-dialog" id="noteDialog" aria-labelledby="noteDialogTitle">
+    <form method="dialog">
+      <div class="note-dialog-heading"><div><p class="eyebrow">NOTA PESSOAL</p><h2 id="noteDialogTitle">Adicionar nota</h2></div><button class="dialog-close" value="cancel" aria-label="Fechar">×</button></div>
+      <p class="note-item-title" id="noteItemTitle"></p>
+      <textarea id="noteText" rows="7" maxlength="2000" placeholder="O que você quer lembrar sobre esta leitura?"></textarea>
+      <div class="note-dialog-actions"><button class="note-delete" id="deleteNoteBtn" type="button">Apagar nota</button><span></span><button class="dialog-secondary" value="cancel">Cancelar</button><button class="dialog-primary" id="saveNoteBtn" type="button">Salvar nota</button></div>
+    </form>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="data.js"></script>
+  <script src="expanded-data.js"></script>
+  <script src="deep-expansions.js"></script>
+  <script src="volume-audit.js"></script>
+  <script src="library-wave-3.js"></script>
+  <script src="library-wave-4.js"></script>
+  <script src="library-wave-5.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

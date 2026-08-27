@@ -1,0 +1,11 @@
+.reading-group{border:1px solid var(--line);border-radius:12px;margin:10px 0;background:rgba(255,255,255,.012);overflow:hidden}
+.reading-group .comic-row{align-items:start;padding:16px;border-bottom:1px solid #1d2027}
+.reading-group>.comic-row:last-child,.companions .comic-row:last-child{border-bottom:0}
+.comic-copy{display:flex;flex-direction:column;gap:4px;min-width:0}
+.comic-copy .comic-title{font-size:15px}
+.comic-details{color:var(--muted);font-size:13px;line-height:1.5}
+.companion-row{margin-left:44px;padding:12px 14px!important;background:#0d0f14;border-left:1px solid #343843}
+.companion-row .comic-title{font-size:13px;color:#d7d9df}
+.reading-group .check{margin-top:2px}
+.reading-group .current-btn{padding-top:2px}
+@media(max-width:520px){.companion-row{margin-left:18px}.reading-group .comic-row{grid-template-columns:26px minmax(0,1fr)}}

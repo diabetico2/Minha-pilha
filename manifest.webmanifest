@@ -1,0 +1,19 @@
+{
+  "name": "Minha Pilha — Checklist de Quadrinhos",
+  "short_name": "Minha Pilha",
+  "description": "Sua estante pessoal de ordens de leitura de quadrinhos.",
+  "lang": "pt-BR",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#08090d",
+  "theme_color": "#08090d",
+  "icons": [
+    {
+      "src": "app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
