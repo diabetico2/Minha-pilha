@@ -283,7 +283,12 @@
         const mainKey = keyFor(order.id, sectionKey, itemIndex);
         const allText = [item.title, item.details, ...(item.companions || []).flatMap(companion => [companion.title, companion.details])].join(' ').toLowerCase();
         if (!allText.includes(query)) return '';
-        const makeRow = (entry, key, companion = false) => {
+        const groupKeys = [mainKey, ...(item.companions || []).map((_, companionIndex) => keyFor(order.id, sectionKey, itemIndex, companionIndex))];
+        const groupRead = groupKeys.filter(key => state.read[key]).length;
+        const groupComplete = groupRead === groupKeys.length;
+        const groupProgress = Math.round(groupRead / groupKeys.length * 100);
+        const groupAction = groupKeys.length > 1 ? `<button class="group-toggle ${groupComplete ? 'is-complete' : ''}" type="button" data-group-keys="${escapeHtml(groupKeys.join('|'))}" aria-label="${groupComplete ? 'Desmarcar' : 'Marcar'} todo o arco">${groupComplete ? '↺ Desmarcar tudo' : '✓ Marcar tudo'}<small>${groupRead}/${groupKeys.length}</small></button>` : '';
+        const makeRow = (entry, key, companion = false, arcAction = '') => {
           const read = Boolean(state.read[key]);
           const current = state.current[order.id] === key;
           const show = filter === 'all' || (filter === 'read' && read) || (filter === 'unread' && !read);
@@ -291,12 +296,12 @@
           visible++;
           const note = state.notes[key]?.trim();
           const date = state.completedAt[key];
-          return `<div class="comic-row ${companion ? 'companion-row' : ''} ${read ? 'is-read' : ''} ${current ? 'is-current' : ''}" data-key="${escapeHtml(key)}"><input class="check" type="checkbox" ${read ? 'checked' : ''} aria-label="Marcar ${escapeHtml(entry.title)} como lido"><span class="comic-copy"><strong class="comic-title">${escapeHtml(entry.title)}</strong>${entry.details ? `<span class="comic-details">${escapeHtml(entry.details)}</span>` : ''}<span class="reading-metadata">${read && date ? `<span class="read-date">✓ Lido em ${formatDate(date)}</span>` : ''}${note ? '<span class="note-saved">● Nota salva</span>' : ''}</span></span><span class="row-actions"><button class="note-btn ${note ? 'has-note' : ''}" type="button">${note ? '✎ Nota' : '＋ Nota'}</button><button class="current-btn" type="button">${current ? '★ Onde parei' : '☆ Marcar onde parei'}</button></span></div>`;
+          return `<div class="comic-row ${companion ? 'companion-row' : ''} ${read ? 'is-read' : ''} ${current ? 'is-current' : ''}" data-key="${escapeHtml(key)}"><input class="check" type="checkbox" ${read ? 'checked' : ''} aria-label="Marcar ${escapeHtml(entry.title)} como lido"><span class="comic-copy"><strong class="comic-title">${escapeHtml(entry.title)}</strong>${entry.details ? `<span class="comic-details">${escapeHtml(entry.details)}</span>` : ''}<span class="reading-metadata">${read && date ? `<span class="read-date">✓ Lido em ${formatDate(date)}</span>` : ''}${note ? '<span class="note-saved">● Nota salva</span>' : ''}</span></span><span class="row-actions">${arcAction}<button class="note-btn ${note ? 'has-note' : ''}" type="button">${note ? '✎ Nota' : '＋ Nota'}</button><button class="current-btn" type="button">${current ? '★ Onde parei' : '☆ Marcar onde parei'}</button></span></div>`;
         };
-        const main = makeRow(item, mainKey);
+        const main = makeRow(item, mainKey, false, groupAction);
         const companions = (item.companions || []).map((companion, companionIndex) => makeRow(companion, keyFor(order.id, sectionKey, itemIndex, companionIndex), true)).join('');
         if (!main && !companions) return '';
-        return `<article class="reading-group">${main}<div class="companions">${companions}</div></article>`;
+        return `<article class="reading-group ${groupComplete ? 'group-complete' : groupRead ? 'group-partial' : ''}" style="--group-progress:${groupProgress}%">${main}<div class="companions">${companions}</div></article>`;
       }).join('');
       return rows ? `<section class="section-block"><h3 class="section-title">${escapeHtml(section.title)}</h3>${rows}</section>` : '';
     }).join('');
@@ -305,9 +310,9 @@
       const check = row.querySelector('.check');
       const currentButton = row.querySelector('.current-btn');
       const noteButton = row.querySelector('.note-btn');
+      const groupToggle = row.querySelector('.group-toggle');
       check.onchange = () => {
         const affected = [row.dataset.key];
-        if (!row.classList.contains('companion-row')) row.closest('.reading-group')?.querySelectorAll('.companion-row').forEach(child => affected.push(child.dataset.key));
         const completedNow = new Date().toISOString();
         affected.forEach(key => {
           if (check.checked) { state.read[key] = true; if (!state.completedAt[key]) state.completedAt[key] = completedNow; }
@@ -329,9 +334,26 @@
         save();
         renderNav();
         renderOrder();
-        if (affected.length > 1) toast(check.checked ? 'Bloco inteiro marcado como lido' : 'Bloco inteiro desmarcado');
-        else if (parentAutoMarked) toast('Obra principal marcada automaticamente');
+        if (parentAutoMarked) toast('Obra principal marcada automaticamente');
         else if (parentPreserved) toast('Subitem desmarcado; obra principal mantida');
+      };
+      if (groupToggle) groupToggle.onclick = () => {
+        const keys = groupToggle.dataset.groupKeys.split('|').filter(Boolean);
+        const markAll = !keys.every(key => state.read[key]);
+        const completedNow = new Date().toISOString();
+        keys.forEach(key => {
+          if (markAll) {
+            state.read[key] = true;
+            if (!state.completedAt[key]) state.completedAt[key] = completedNow;
+          } else {
+            delete state.read[key];
+            delete state.completedAt[key];
+          }
+        });
+        save();
+        renderNav();
+        renderOrder();
+        toast(markAll ? 'Arco inteiro marcado como lido' : 'Arco inteiro desmarcado');
       };
       currentButton.onclick = () => { state.current[order.id] = row.dataset.key; save(); renderOrder(); toast('Ponto de leitura atualizado'); };
       noteButton.onclick = () => openNote(row.dataset.key, row.querySelector('.comic-title').textContent);

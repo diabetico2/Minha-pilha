@@ -260,12 +260,53 @@ body {
 .era-picker select:focus, .search:focus-within { border-color: var(--red); }
 
 .reading-group {
+  position: relative;
   box-shadow: 0 8px 24px rgba(0, 0, 0, .08);
   transition: border-color .18s;
 }
+.reading-group:before {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  width: var(--group-progress, 0%);
+  height: 2px;
+  background: linear-gradient(90deg, var(--red), var(--gold));
+  box-shadow: 0 0 12px rgb(var(--theme-rgb) / .22);
+  transition: width .28s ease;
+}
+.reading-group.group-complete { border-color: rgb(var(--theme-rgb) / .34); }
 .reading-group:hover { border-color: #363a45; }
 .comic-row { grid-template-columns: 28px minmax(0, 1fr) auto; }
 .row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.group-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgb(var(--theme-rgb) / .28);
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: rgb(var(--theme-rgb) / .08);
+  color: var(--red);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.group-toggle:hover { background: rgb(var(--theme-rgb) / .16); border-color: rgb(var(--theme-rgb) / .52); }
+.group-toggle small {
+  min-width: 27px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .07);
+  color: var(--muted);
+  font-size: 9px;
+  text-align: center;
+}
+.group-toggle.is-complete { background: var(--red); color: var(--check-ink); border-color: var(--red); }
+.group-toggle.is-complete small { background: rgba(8, 9, 13, .18); color: inherit; }
 .note-btn,
 .current-btn { border-radius: 999px; padding: 5px 8px; }
 .note-btn {
@@ -360,6 +401,7 @@ body {
   .backup-reminder { align-items: flex-start; flex-direction: column; }
   .comic-row { grid-template-columns: 26px minmax(0, 1fr); }
   .row-actions { grid-column: 2; justify-content: flex-start; flex-wrap: wrap; }
+  .group-toggle { order: -1; }
   .companion-row .row-actions { grid-column: 2; }
   .note-dialog-actions { grid-template-columns: 1fr 1fr; }
   .note-dialog-actions span { display: none; }

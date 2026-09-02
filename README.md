@@ -9,6 +9,7 @@ Abra `index.html` no navegador. O progresso é salvo automaticamente no armazena
 ## Recursos pessoais
 
 - Checklist com marcação automática entre volumes e subitens.
+- Botão “Marcar tudo” com contador e progresso visual para cada arco.
 - Ponto de leitura, próxima HQ não lida e filtro por era/fase.
 - Estante de ordens em andamento, favoritas e “Quero ler”.
 - Notas pessoais e data de conclusão em cada item.
