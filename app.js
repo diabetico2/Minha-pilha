@@ -34,6 +34,21 @@
     };
   }
 
+  function isValidDate(value) {
+    return typeof value === 'string' && !Number.isNaN(new Date(value).getTime());
+  }
+
+  function ensureCompletionDates(target, fallbackDate = new Date().toISOString()) {
+    if (!target.completedAt || typeof target.completedAt !== 'object') target.completedAt = {};
+    const safeFallback = isValidDate(fallbackDate) ? fallbackDate : new Date().toISOString();
+    Object.keys(target.read || {}).forEach(key => {
+      if (target.read[key] && !isValidDate(target.completedAt[key])) target.completedAt[key] = safeFallback;
+    });
+    Object.keys(target.completedAt).forEach(key => {
+      if (!target.read?.[key]) delete target.completedAt[key];
+    });
+  }
+
   function load() {
     for (const key of [KEY, AUTO_BACKUP_KEY]) {
       try {
@@ -279,6 +294,7 @@
           else { delete state.read[key]; delete state.completedAt[key]; }
         });
         let parentAutoMarked = false;
+        let parentPreserved = false;
         if (row.classList.contains('companion-row')) {
           const group = row.closest('.reading-group');
           const parent = group?.querySelector(':scope > .comic-row');
@@ -287,7 +303,7 @@
             const wasMarked = Boolean(state.read[parent.dataset.key]);
             const allMarked = children.every(child => Boolean(state.read[child.dataset.key]));
             if (allMarked) { state.read[parent.dataset.key] = true; if (!state.completedAt[parent.dataset.key]) state.completedAt[parent.dataset.key] = completedNow; parentAutoMarked = !wasMarked; }
-            else { delete state.read[parent.dataset.key]; delete state.completedAt[parent.dataset.key]; }
+            else if (wasMarked) parentPreserved = true;
           }
         }
         save();
@@ -295,6 +311,7 @@
         renderOrder();
         if (affected.length > 1) toast(check.checked ? 'Bloco inteiro marcado como lido' : 'Bloco inteiro desmarcado');
         else if (parentAutoMarked) toast('Obra principal marcada automaticamente');
+        else if (parentPreserved) toast('Subitem desmarcado; obra principal mantida');
       };
       currentButton.onclick = () => { state.current[order.id] = row.dataset.key; save(); renderOrder(); toast('Ponto de leitura atualizado'); };
       noteButton.onclick = () => openNote(row.dataset.key, row.querySelector('.comic-title').textContent);
@@ -335,9 +352,11 @@
     toast(`Próxima leitura: ${target.title}`);
   }
   function exportProgress() {
-    state.lastBackupAt = new Date().toISOString();
+    const exportedAt = new Date().toISOString();
+    state.lastBackupAt = exportedAt;
+    ensureCompletionDates(state, exportedAt);
     save();
-    const payload = JSON.stringify({ version: 2, exportedAt: state.lastBackupAt, app: 'Minha Pilha', progress: state }, null, 2);
+    const payload = JSON.stringify({ version: 3, schema: 'minha-pilha-progress', exportedAt, app: 'Minha Pilha', progress: blankState(state) }, null, 2);
     const blob = new Blob([payload], { type: 'application/json' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -382,6 +401,7 @@
     try {
       const data = JSON.parse(await file.text());
       const imported = blankState(data.progress || data);
+      ensureCompletionDates(imported, data.exportedAt || imported.savedAt || new Date().toISOString());
       Object.keys(state).forEach(key => delete state[key]);
       Object.assign(state, imported);
       save(); render(); toast('Backup restaurado');

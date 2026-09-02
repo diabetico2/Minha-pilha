@@ -1,4 +1,4 @@
-const CACHE_NAME = 'minha-pilha-v3';
+const CACHE_NAME = 'minha-pilha-v4';
 const CORE_FILES = [
   './',
   './index.html',
