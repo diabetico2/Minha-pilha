@@ -9,7 +9,7 @@
   const AUTO_BACKUP_KEY = 'minha-pilha-v1-auto-backup';
   let recoveredFromBackup = false;
   const state = load();
-  let selected = orders[0]?.id;
+  let selected = orders.some(order => order.id === state.lastSelectedOrder) ? state.lastSelectedOrder : orders[0]?.id;
   let filter = 'all';
   let era = 'all';
   let query = '';
@@ -29,6 +29,7 @@
       favoriteOrders: raw.favoriteOrders && typeof raw.favoriteOrders === 'object' ? raw.favoriteOrders : {},
       queueOrders: raw.queueOrders && typeof raw.queueOrders === 'object' ? raw.queueOrders : {},
       completedAt: raw.completedAt && typeof raw.completedAt === 'object' ? raw.completedAt : {},
+      lastSelectedOrder: typeof raw.lastSelectedOrder === 'string' ? raw.lastSelectedOrder : null,
       savedAt: raw.savedAt || null,
       lastBackupAt: raw.lastBackupAt || null
     };
@@ -163,6 +164,21 @@
     $('#backupReminder').hidden = !backupDue;
   }
 
+  function applyOrderTheme(order) {
+    const theme = window.MINHA_PILHA_THEME_FOR?.(order);
+    if (!theme) return;
+    const root = document.documentElement;
+    root.dataset.characterTheme = theme.key;
+    root.style.setProperty('--red', theme.accent);
+    root.style.setProperty('--red2', theme.accentDark);
+    root.style.setProperty('--gold', theme.secondary);
+    root.style.setProperty('--theme-rgb', theme.rgb);
+    root.style.setProperty('--theme-secondary-rgb', theme.secondaryRgb);
+    root.style.setProperty('--check-ink', theme.checkInk);
+    root.style.setProperty('--soft-red', `rgb(${theme.rgb} / .12)`);
+    root.style.setProperty('--soft-gold', `rgb(${theme.secondaryRgb} / .12)`);
+  }
+
   function renderFeatured() {
     const list = shelfOrders(shelfView);
     $('#currentShelfCount').textContent = shelfOrders('current').length;
@@ -215,11 +231,14 @@
   function shortTitle(title) { return title.replace(' Reading Order', '').replace(/, The Modern Age.*$/, ' — Modern Age').replace(/ \(.+$/, ''); }
   function selectOrder(id) {
     selected = id;
+    state.lastSelectedOrder = id;
+    applyOrderTheme(orders.find(order => order.id === id));
     query = '';
     era = 'all';
     filter = 'all';
     $('#searchInput').value = '';
     document.querySelectorAll('.filter').forEach(button => button.classList.toggle('active', button.dataset.filter === 'all'));
+    save();
     render();
     document.querySelector('.library').scrollIntoView({ behavior: 'smooth' });
   }
@@ -241,6 +260,7 @@
   function renderOrder() {
     const order = orders.find(item => item.id === selected);
     if (!order) return;
+    applyOrderTheme(order);
     const progress = counts(order);
     $('#libraryTitle').textContent = order.title;
     $('#orderPercent').textContent = progress.pct + '%';
@@ -423,7 +443,7 @@
     $('#installBtn').hidden = true;
   };
   window.addEventListener('appinstalled', () => { $('#installBtn').hidden = true; toast('Minha Pilha instalada'); });
-  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {}));
 
   render();
   if (recoveredFromBackup) setTimeout(() => toast('Progresso recuperado do backup automático'), 500);

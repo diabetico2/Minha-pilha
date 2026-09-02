@@ -1,4 +1,4 @@
-const CACHE_NAME = 'minha-pilha-v4';
+const CACHE_NAME = 'minha-pilha-v5';
 const CORE_FILES = [
   './',
   './index.html',
@@ -6,6 +6,7 @@ const CORE_FILES = [
   './hierarchy.css',
   './library-groups.css',
   './enhancements.css',
+  './character-themes.css',
   './app-icon.svg',
   './manifest.webmanifest',
   './data.js',
@@ -15,6 +16,7 @@ const CORE_FILES = [
   './library-wave-3.js',
   './library-wave-4.js',
   './library-wave-5.js',
+  './character-themes.js',
   './app.js'
 ];
 

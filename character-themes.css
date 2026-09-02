@@ -1,0 +1,87 @@
+:root {
+  --theme-rgb: 240 200 75;
+  --theme-secondary-rgb: 114 145 186;
+  --check-ink: #08090d;
+  --soft-red: rgb(var(--theme-rgb) / .12);
+  --soft-gold: rgb(var(--theme-secondary-rgb) / .12);
+}
+
+body,
+.hero,
+.topbar,
+.current-section,
+.sidebar,
+.content,
+.featured-card,
+.reading-group,
+.comic-row,
+.brand-mark,
+.eyebrow,
+.progress-ring,
+.check,
+.filter,
+.next-unread,
+.collection-action,
+.nav-button {
+  transition: color .32s ease, background-color .32s ease, border-color .32s ease, box-shadow .32s ease;
+}
+
+body {
+  background:
+    radial-gradient(circle at 8% 18%, rgb(var(--theme-rgb) / .075), transparent 26rem),
+    radial-gradient(circle at 92% 62%, rgb(var(--theme-secondary-rgb) / .055), transparent 30rem),
+    var(--bg);
+}
+
+.hero {
+  background:
+    radial-gradient(circle at 78% 26%, rgb(var(--theme-rgb) / .2), transparent 28%),
+    radial-gradient(circle at 68% 76%, rgb(var(--theme-secondary-rgb) / .07), transparent 24%),
+    linear-gradient(135deg, #0d0f15, #08090d 58%);
+}
+
+.hero:after {
+  border-color: rgb(var(--theme-rgb) / .28);
+  box-shadow: 0 0 80px rgb(var(--theme-rgb) / .09);
+}
+
+.nav-button.active {
+  background: linear-gradient(90deg, rgb(var(--theme-rgb) / .13), transparent);
+}
+
+.comic-row.is-current {
+  background: rgb(var(--theme-rgb) / .08);
+}
+
+.check:checked:after { color: var(--check-ink); }
+
+.featured-card:hover,
+.featured-card:focus-visible {
+  border-color: rgb(var(--theme-rgb) / .52);
+  box-shadow: 0 24px 58px rgba(0, 0, 0, .3), 0 0 0 1px rgb(var(--theme-rgb) / .1);
+}
+
+.progress-ring { box-shadow: 0 0 28px rgb(var(--theme-rgb) / .12); }
+.section-title:after { background: linear-gradient(90deg, rgb(var(--theme-rgb) / .26), var(--line)); }
+.family-group[open] > summary { color: var(--ink); }
+.publisher-group > h3 { text-shadow: 0 0 18px rgb(var(--theme-rgb) / .18); }
+
+@media (prefers-reduced-motion: reduce) {
+  body,
+  .hero,
+  .topbar,
+  .current-section,
+  .sidebar,
+  .content,
+  .featured-card,
+  .reading-group,
+  .comic-row,
+  .brand-mark,
+  .eyebrow,
+  .progress-ring,
+  .check,
+  .filter,
+  .next-unread,
+  .collection-action,
+  .nav-button { transition: none; }
+}

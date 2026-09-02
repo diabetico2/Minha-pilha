@@ -14,6 +14,7 @@ Abra `index.html` no navegador. O progresso é salvo automaticamente no armazena
 - Notas pessoais e data de conclusão em cada item.
 - Backup em JSON, lembrete de cópia externa e recuperação interna automática.
 - Funcionamento offline e instalação como aplicativo quando o navegador oferecer essa opção.
+- Tema de cores automático de acordo com o personagem ou equipe selecionada.
 
 ## Publicar no GitHub Pages
 
@@ -45,6 +46,7 @@ O arquivo `data.js` será reconstruído. Os identificadores são derivados dos t
 - `library-wave-4.js`: última expansão da biblioteca, com jovens heróis, núcleo urbano e cósmico da Marvel, mais mutantes, Aranhas e equipes e personagens clássicos da DC.
 - `library-wave-5.js`: ordem completa do Doutor Destino, da origem clássica a *One World Under Doom*.
 - `enhancements.css`: acabamento visual da estante, notas, filtros e navegação de leitura.
+- `character-themes.js` e `character-themes.css`: paletas dinâmicas de personagens, equipes e editoras.
 - `manifest.webmanifest`, `app-icon.svg` e `sw.js`: instalação e funcionamento offline.
 - `fontes/`: local para novos HTMLs.
 - `ferramentas/importar_html.py`: importador sem dependências externas.
