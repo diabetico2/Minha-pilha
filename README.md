@@ -11,12 +11,21 @@ Extraia o ZIP e abra **index.html**. Mantenha os arquivos juntos na mesma pasta.
 - Biblioteca lateral com busca por personagem, editora e ordem.
 - Tela de leitura direta, com próximo item e ponto de leitura em destaque.
 - Itens associados recolhíveis e opção de expandir todos os detalhes.
-- Estante separada em andamento, favoritas e quero ler.
+- Estante separada em andamento, favoritas, quero ler e concluídas.
+- Ordens totalmente lidas saem de “Em andamento”, mesmo com um ponto de leitura salvo.
+- Clique novamente no marcador ativo para remover o ponto de leitura.
 - Interface adaptada a celular e computador, navegação por teclado e atalho `/` para busca.
 - Correção da próxima leitura para incluir a obra principal, mesmo quando há itens associados.
 - Validação dos backups antes de restaurar e aviso quando o navegador não consegue salvar.
 
-As 107 ordens e os 5.587 itens foram preservados. Esta atualização é da interface e do funcionamento; não é uma revisão bibliográfica do catálogo. Títulos e descrições da fonte permanecem no idioma original. A contagem inclui itens principais e associados, conforme a versão anterior.
+As 107 ordens anteriores e suas chaves de progresso foram preservadas. A biblioteca agora inclui também Watchmen e V de Vingança, detalhados por volumes e edições. A contagem inclui itens principais e associados, conforme a versão anterior. Doctor Fate aparece com o nome em inglês para distingui-lo do Doutor Destino da Marvel.
+
+### Novas leituras
+
+- **Watchmen:** obra original, volumes de Before Watchmen, especiais, The Button, os dois volumes de Doomsday Clock, Flashpoint Beyond e Rorschach. A obra original vem primeiro; as expansões são opcionais. Referência: [Comic Book Treasury](https://www.comicbooktreasury.com/comics-watchmen-reading-order-doomsday-clock/). A divisão de Doomsday Clock em #1–6 e #7–12 segue a [DC](https://www.dc.com/blog/2019/04/26/geoff-johns-and-gary-frank-s-doomsday-clock-part-one-is-coming-this-october).
+- **V de Vingança:** série completa em dez edições, conforme a [DC](https://www.dc.com/blog/2023/01/10/dc-universe-infinit-es-new-ultra-tier-from-a-to-z).
+
+As novas ordens mantêm a organização por editora, universo, fases, volumes e subitens solicitada no v1. As listas antigas não passaram por uma nova revisão bibliográfica.
 
 ## Trazer o progresso anterior
 

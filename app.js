@@ -146,11 +146,12 @@
   function activeOrders() {
     return orders.filter(order => {
       const progress = counts(order);
-      return (progress.read > 0 && progress.read < progress.total) || Boolean(state.current[order.id]);
+      return progress.read < progress.total && (progress.read > 0 || Boolean(state.current[order.id]));
     });
   }
   function uniqueOrders(list) { const seen = new Set(); return list.filter(order => order && !seen.has(order.id) && seen.add(order.id)); }
   function shelfOrders(view) {
+    if (view === 'completed') return orders.filter(order => { const progress = counts(order); return progress.total > 0 && progress.read === progress.total; });
     if (view === 'favorites') return orders.filter(order => state.favoriteOrders[order.id]);
     if (view === 'queue') return orders.filter(order => state.queueOrders[order.id]);
     return activeOrders();
@@ -179,7 +180,7 @@
       return accumulator;
     }, { total: 0, read: 0 });
     $('#libraryCount').textContent = orders.length;
-    $('#shelfCount').textContent = uniqueOrders([...activeOrders(), ...shelfOrders('favorites'), ...shelfOrders('queue')]).length;
+    $('#shelfCount').textContent = uniqueOrders([...activeOrders(), ...shelfOrders('completed'), ...shelfOrders('favorites'), ...shelfOrders('queue')]).length;
     $('#totalItems').textContent = total.total.toLocaleString('pt-BR');
     $('#totalRead').textContent = total.read.toLocaleString('pt-BR');
     $('#totalPercent').textContent = (total.total ? Math.round(total.read / total.total * 100) : 0) + '%';
@@ -217,10 +218,12 @@
     $('#currentShelfCount').textContent = shelfOrders('current').length;
     $('#favoriteShelfCount').textContent = shelfOrders('favorites').length;
     $('#queueShelfCount').textContent = shelfOrders('queue').length;
+    $('#completedShelfCount').textContent = shelfOrders('completed').length;
     const labels = {
       current: ['Continue de onde parou', 'Suas ordens ativas, reunidas em um só lugar.'],
       favorites: ['Suas histórias favoritas', 'As ordens que você quer manter sempre por perto.'],
-      queue: ['Sua próxima pilha', 'Tudo o que você separou para ler em breve.']
+      queue: ['Sua próxima pilha', 'Tudo o que você separou para ler em breve.'],
+      completed: ['Histórias que você já viveu', 'Ordens com todos os itens marcados como lidos.']
     };
     $('#currentTitle').textContent = labels[shelfView][0];
     $('#shelfDescription').textContent = labels[shelfView][1];
@@ -232,12 +235,13 @@
     $('#featuredOrders').innerHTML = list.map((order, index) => {
       const progress = counts(order);
       const flags = `${state.favoriteOrders[order.id] ? '<span title="Favorita">★</span>' : ''}${state.queueOrders[order.id] ? '<span title="Quero ler">＋</span>' : ''}`;
-      return `<article class="featured-card" data-id="${escapeHtml(order.id)}" data-number="${String(index + 1).padStart(2, '0')}" tabindex="0"><div class="featured-top"><span class="tag">${escapeHtml(order.publisher)} · ${escapeHtml(order.family)}</span><span class="featured-flags">${flags}</span></div><h3>${escapeHtml(order.title)}</h3><div class="bar"><span style="width:${progress.pct}%"></span></div><div class="card-progress"><span>${progress.read} de ${progress.total} itens</span><strong>${progress.pct}%</strong></div><p class="resume"><b>ONDE PAREI</b><br>${escapeHtml(currentText(order))}</p></article>`;
+      return `<article class="featured-card" data-id="${escapeHtml(order.id)}" data-number="${String(index + 1).padStart(2, '0')}" tabindex="0"><div class="featured-top"><span class="tag">${escapeHtml(order.publisher)} · ${escapeHtml(order.family)}</span><span class="featured-flags">${flags}</span></div><h3>${escapeHtml(order.title)}</h3><div class="bar"><span style="width:${progress.pct}%"></span></div><div class="card-progress"><span>${progress.read} de ${progress.total} itens</span><strong>${progress.pct}%</strong></div><p class="resume">${progress.read === progress.total ? '<b>LEITURA CONCLUÍDA ✓</b>' : `<b>ONDE PAREI</b><br>${escapeHtml(currentText(order))}`}</p></article>`;
     }).join('');
     const empty = $('#shelfEmpty');
     empty.hidden = list.length > 0;
     empty.innerHTML = shelfView === 'favorites' ? '<b>Suas favoritas moram aqui.</b><span>Abra uma ordem e use “Favoritar” para guardá-la nesta estante.</span>' : shelfView === 'queue' ? '<b>O que vem na próxima pilha?</b><span>Use “Quero ler” em uma ordem para reservá-la para depois.</span>' : '<b>Sua primeira história está esperando.</b><span>Marque um item como lido ou guarde onde parou para continuar por aqui.</span>';
     empty.innerHTML += '<button class="icon-button" id="browseLibraryBtn">Explorar biblioteca →</button>';
+    if (shelfView === 'completed') empty.innerHTML = '<b>Cada última página merece um lugar.</b><span>Ao concluir todos os itens de uma ordem, ela aparece aqui automaticamente.</span><button class="icon-button" id="browseLibraryBtn">Explorar biblioteca →</button>';
     $('#browseLibraryBtn').onclick = () => showView('library');
     document.querySelectorAll('.featured-card').forEach(card => {
       const open = () => selectOrder(card.dataset.id);
@@ -305,7 +309,7 @@
     const progress = counts(order);
     const batmanModern = order.id === 'batman-reading-order-the-modern-age-post-crisis';
     $('#libraryTitle').textContent = batmanModern ? 'Batman' : shortTitle(order.title);
-    $('#orderSubtitle').textContent = batmanModern ? 'A Era Moderna · Pós-Crise' : `${order.publisher} · ${order.family}`;
+    $('#orderSubtitle').textContent = order.description || (batmanModern ? 'A Era Moderna · Pós-Crise' : `${order.publisher} · ${order.family}`);
     $('#publisherBadge').textContent = order.publisher;
     $('#orderPhaseCount').textContent = `${order.sections.length} FASES`;
     $('#orderProgressText').textContent = `${progress.read.toLocaleString('pt-BR')} de ${progress.total.toLocaleString('pt-BR')} itens lidos`;
@@ -413,9 +417,24 @@
         renderOrder();
         toast(markAll ? 'Arco inteiro marcado como lido' : 'Arco inteiro desmarcado');
       };
-      currentButton.onclick = () => { state.current[order.id] = row.dataset.key; save(); renderOrder(); toast('Ponto de leitura atualizado'); };
+      currentButton.setAttribute('aria-pressed', String(state.current[order.id] === row.dataset.key));
+      if (state.current[order.id] === row.dataset.key) {
+        currentButton.textContent = '★ Remover marcador';
+        currentButton.title = 'Remover ponto de leitura';
+        currentButton.setAttribute('aria-label', `Remover ponto de leitura: ${row.querySelector('.comic-title').textContent}`);
+      }
+      currentButton.onclick = () => {
+        const marked = toggleReadingPoint(order.id, row.dataset.key);
+        save(); renderOrder(); toast(marked ? 'Ponto de leitura atualizado' : 'Ponto de leitura removido');
+      };
       noteButton.onclick = () => openNote(row.dataset.key, row.querySelector('.comic-title').textContent);
     });
+  }
+
+  function toggleReadingPoint(orderId, key) {
+    if (state.current[orderId] === key) { delete state.current[orderId]; return false; }
+    state.current[orderId] = key;
+    return true;
   }
 
   function openNote(key, title) {
