@@ -8,6 +8,11 @@
   const KEY = 'minha-pilha-v1';
   const AUTO_BACKUP_KEY = 'minha-pilha-v1-auto-backup';
   let recoveredFromBackup = false;
+  let storageWarning = false;
+  const expandedGroups = new Set();
+  let expandAll = false;
+  let navQuery = '';
+  const normalize = value => String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const state = load();
   let selected = orders.some(order => order.id === state.lastSelectedOrder) ? state.lastSelectedOrder : orders[0]?.id;
   let filter = 'all';
@@ -21,6 +26,22 @@
   const escapeHtml = value => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
   const keyFor = (orderId, sectionIndex, itemIndex, childIndex = null) => `${orderId}:${sectionIndex}:${itemIndex}${childIndex === null ? '' : ':c' + childIndex}`;
 
+  function validateProgress(raw) {
+    const plain = value => value && typeof value === 'object' && !Array.isArray(value);
+    if (!plain(raw) || !plain(raw.read)) throw new Error('Formato inválido');
+    const schemas = { read: 'boolean', current: 'string', notes: 'string', favoriteOrders: 'boolean', queueOrders: 'boolean', completedAt: 'date' };
+    for (const [field, type] of Object.entries(schemas)) {
+      if (raw[field] === undefined) continue;
+      if (!plain(raw[field])) throw new Error('Mapa inválido');
+      for (const [key, value] of Object.entries(raw[field])) {
+        if (['__proto__', 'constructor', 'prototype'].includes(key)) throw new Error('Chave inválida');
+        if (type === 'date' ? !isValidDate(value) : typeof value !== type) throw new Error('Valor inválido');
+      }
+    }
+    if (raw.lastSelectedOrder != null && typeof raw.lastSelectedOrder !== 'string') throw new Error('Ordem inválida');
+    for (const field of ['savedAt', 'lastBackupAt']) if (raw[field] != null && !isValidDate(raw[field])) throw new Error('Data inválida');
+    return blankState(raw);
+  }
   function blankState(raw = {}) {
     return {
       read: raw.read && typeof raw.read === 'object' ? raw.read : {},
@@ -56,8 +77,9 @@
         const raw = localStorage.getItem(key);
         if (!raw) continue;
         const parsed = JSON.parse(raw);
+        const validated = validateProgress(parsed);
         if (key === AUTO_BACKUP_KEY) recoveredFromBackup = true;
-        return blankState(parsed);
+        return validated;
       } catch {}
     }
     return blankState();
@@ -65,10 +87,18 @@
 
   function save() {
     state.savedAt = new Date().toISOString();
-    const previous = localStorage.getItem(KEY);
     const serialized = JSON.stringify(state);
-    if (previous && previous !== serialized) localStorage.setItem(AUTO_BACKUP_KEY, previous);
-    localStorage.setItem(KEY, serialized);
+    try {
+      const previous = localStorage.getItem(KEY);
+      if (previous && previous !== serialized) {
+        try { validateProgress(JSON.parse(previous)); localStorage.setItem(AUTO_BACKUP_KEY, previous); } catch {}
+      }
+      localStorage.setItem(KEY, serialized);
+      storageWarning = false;
+    } catch {
+      storageWarning = true;
+      toast('Não foi possível salvar no navegador. Baixe um backup para guardar suas alterações.');
+    }
     updateStats();
     renderFeatured();
     updateSaveStatus();
@@ -96,7 +126,7 @@
     return entries;
   }
 
-  function readableEntriesFor(order) { return entriesFor(order).filter(entry => entry.isCompanion || !entry.hasCompanions); }
+  function readableEntriesFor(order) { return entriesFor(order); }
 
   function currentText(order) {
     const currentKey = state.current[order.id];
@@ -123,7 +153,7 @@
   function shelfOrders(view) {
     if (view === 'favorites') return orders.filter(order => state.favoriteOrders[order.id]);
     if (view === 'queue') return orders.filter(order => state.queueOrders[order.id]);
-    return uniqueOrders([...orders.slice(0, 2), ...activeOrders()]);
+    return activeOrders();
   }
 
   function formatDate(value, includeTime = false) {
@@ -148,6 +178,8 @@
       accumulator.read += progress.read;
       return accumulator;
     }, { total: 0, read: 0 });
+    $('#libraryCount').textContent = orders.length;
+    $('#shelfCount').textContent = uniqueOrders([...activeOrders(), ...shelfOrders('favorites'), ...shelfOrders('queue')]).length;
     $('#totalItems').textContent = total.total.toLocaleString('pt-BR');
     $('#totalRead').textContent = total.read.toLocaleString('pt-BR');
     $('#totalPercent').textContent = (total.total ? Math.round(total.read / total.total * 100) : 0) + '%';
@@ -156,7 +188,8 @@
 
   function updateSaveStatus() {
     const saveStatus = $('#saveStatus');
-    saveStatus.querySelector('span').textContent = relativeSave(state.savedAt);
+    saveStatus.querySelector('span').textContent = storageWarning ? 'Alterações não salvas' : relativeSave(state.savedAt);
+    saveStatus.querySelector('i').style.background = storageWarning ? '#eb8d69' : '';
     saveStatus.title = state.savedAt ? `Último salvamento: ${formatDate(state.savedAt, true)}` : 'O progresso será salvo automaticamente';
     const lastBackup = state.lastBackupAt ? new Date(state.lastBackupAt).getTime() : 0;
     const backupDue = !lastBackup || Date.now() - lastBackup > 14 * 86400000;
@@ -194,7 +227,7 @@
     document.querySelectorAll('.shelf-tab').forEach(button => {
       const active = button.dataset.shelf === shelfView;
       button.classList.toggle('active', active);
-      button.setAttribute('aria-selected', String(active));
+      button.setAttribute('aria-pressed', String(active));
     });
     $('#featuredOrders').innerHTML = list.map((order, index) => {
       const progress = counts(order);
@@ -203,7 +236,9 @@
     }).join('');
     const empty = $('#shelfEmpty');
     empty.hidden = list.length > 0;
-    empty.innerHTML = shelfView === 'favorites' ? '<b>Nenhuma favorita ainda.</b><span>Abra uma ordem e use “Favoritar”.</span>' : '<b>Sua lista está vazia.</b><span>Abra uma ordem e use “Quero ler”.</span>';
+    empty.innerHTML = shelfView === 'favorites' ? '<b>Suas favoritas moram aqui.</b><span>Abra uma ordem e use “Favoritar” para guardá-la nesta estante.</span>' : shelfView === 'queue' ? '<b>O que vem na próxima pilha?</b><span>Use “Quero ler” em uma ordem para reservá-la para depois.</span>' : '<b>Sua primeira história está esperando.</b><span>Marque um item como lido ou guarde onde parou para continuar por aqui.</span>';
+    empty.innerHTML += '<button class="icon-button" id="browseLibraryBtn">Explorar biblioteca →</button>';
+    $('#browseLibraryBtn').onclick = () => showView('library');
     document.querySelectorAll('.featured-card').forEach(card => {
       const open = () => selectOrder(card.dataset.id);
       card.onclick = open;
@@ -212,13 +247,15 @@
   }
 
   function renderNav() {
+    const visibleOrders = orders.filter(order => normalize([order.title, order.family, order.publisher].join(' ')).includes(navQuery));
+    $('#navEmpty').hidden = visibleOrders.length > 0;
     const preferredPublishers = ['DC', 'Marvel', 'Dark Horse'];
-    const publishers = [...preferredPublishers.filter(publisher => orders.some(order => order.publisher === publisher)), ...[...new Set(orders.map(order => order.publisher))].filter(publisher => !preferredPublishers.includes(publisher))];
+    const publishers = [...preferredPublishers.filter(publisher => visibleOrders.some(order => order.publisher === publisher)), ...[...new Set(visibleOrders.map(order => order.publisher))].filter(publisher => !preferredPublishers.includes(publisher))];
     $('#orderNav').innerHTML = publishers.map(publisher => {
-      const families = [...new Set(orders.filter(order => order.publisher === publisher).map(order => order.family))];
+      const families = [...new Set(visibleOrders.filter(order => order.publisher === publisher).map(order => order.family))];
       return `<section class="publisher-group"><h3>${escapeHtml(publisher)}</h3>${families.map(family => {
-        const list = orders.filter(order => order.publisher === publisher && order.family === family);
-        return `<details class="family-group" ${list.some(order => order.id === selected) ? 'open' : ''}><summary>${escapeHtml(family)}<span>${list.length}</span></summary><div>${list.map(order => {
+        const list = visibleOrders.filter(order => order.publisher === publisher && order.family === family);
+        return `<details class="family-group" ${navQuery || list.some(order => order.id === selected) ? 'open' : ''}><summary>${escapeHtml(family)}<span>${list.length}</span></summary><div>${list.map(order => {
           const progress = counts(order);
           const flags = `${state.favoriteOrders[order.id] ? '★' : ''}${state.queueOrders[order.id] ? '＋' : ''}`;
           return `<button class="nav-button ${order.id === selected ? 'active' : ''}" data-id="${escapeHtml(order.id)}"><span>${escapeHtml(shortTitle(order.title))}${flags ? `<i class="nav-flags">${flags}</i>` : ''}</span><small>${progress.read}/${progress.total} · ${progress.pct}%</small></button>`;
@@ -230,7 +267,11 @@
 
   function shortTitle(title) { return title.replace(' Reading Order', '').replace(/, The Modern Age.*$/, ' — Modern Age').replace(/ \(.+$/, ''); }
   function selectOrder(id) {
+    if (!orders.some(order => order.id === id)) return;
     selected = id;
+    showView('library', false);
+    $('#sidebar').classList.remove('nav-open');
+    $('#mobileNavBtn').setAttribute('aria-expanded', 'false');
     state.lastSelectedOrder = id;
     applyOrderTheme(orders.find(order => order.id === id));
     query = '';
@@ -262,18 +303,29 @@
     if (!order) return;
     applyOrderTheme(order);
     const progress = counts(order);
-    $('#libraryTitle').textContent = order.title;
+    const batmanModern = order.id === 'batman-reading-order-the-modern-age-post-crisis';
+    $('#libraryTitle').textContent = batmanModern ? 'Batman' : shortTitle(order.title);
+    $('#orderSubtitle').textContent = batmanModern ? 'A Era Moderna · Pós-Crise' : `${order.publisher} · ${order.family}`;
+    $('#publisherBadge').textContent = order.publisher;
+    $('#orderPhaseCount').textContent = `${order.sections.length} FASES`;
+    $('#orderProgressText').textContent = `${progress.read.toLocaleString('pt-BR')} de ${progress.total.toLocaleString('pt-BR')} itens lidos`;
+    $('#orderProgressBar').style.width = progress.pct + '%';
     $('#orderPercent').textContent = progress.pct + '%';
     updateCollectionButtons(order);
     const eraSelect = $('#eraFilter');
     const eraOptions = order.sections.map((section, sectionIndex) => ({ value: String(section.key ?? sectionIndex), label: section.title }));
     if (era !== 'all' && !eraOptions.some(option => option.value === era)) era = 'all';
-    eraSelect.innerHTML = `<option value="all">Todas as eras</option>${eraOptions.map(option => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`).join('')}`;
+    eraSelect.innerHTML = `<option value="all">Todas as fases</option>${eraOptions.map(option => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`).join('')}`;
     eraSelect.value = era;
     const unread = readableEntriesFor(order).filter(entry => !state.read[entry.key]);
     const nextButton = $('#nextUnreadBtn');
     nextButton.disabled = !unread.length;
-    nextButton.textContent = unread.length ? `Próxima não lida · ${unread.length} →` : 'Ordem concluída ✓';
+    const target = nextEntry(order);
+    const savedPoint = target && state.current[order.id] === target.key;
+    nextButton.textContent = target ? (savedPoint ? 'Retomar leitura →' : progress.read ? 'Próxima leitura →' : 'Começar leitura →') : 'Ordem concluída ✓';
+    $('#resumeLabel').textContent = savedPoint ? 'ONDE VOCÊ PAROU' : 'PRÓXIMA LEITURA';
+    $('#resumeTitle').textContent = target?.title || 'Todas as leituras desta ordem estão concluídas.';
+    $('#resumePhase').textContent = target ? (order.sections.find((section, index) => target.key.startsWith(`${order.id}:${section.key ?? index}:`))?.title || '') : 'Sua pilha ganhou mais uma história.';
     $('#orderMeta').innerHTML = `<span><b>${escapeHtml(order.publisher)} › ${escapeHtml(order.family)}</b> · ${order.sections.length} capítulos · ${progress.total} itens</span>${order.source ? `<a class="source-link" href="${escapeHtml(order.source)}" target="_blank" rel="noopener">Ver fonte original ↗</a>` : ''}`;
     let visible = 0;
     $('#sections').innerHTML = order.sections.map((section, sectionIndex) => {
@@ -281,8 +333,8 @@
       const rows = section.items.map((item, itemIndex) => {
         const sectionKey = section.key ?? sectionIndex;
         const mainKey = keyFor(order.id, sectionKey, itemIndex);
-        const allText = [item.title, item.details, ...(item.companions || []).flatMap(companion => [companion.title, companion.details])].join(' ').toLowerCase();
-        if (!allText.includes(query)) return '';
+        const allText = [item.title, item.details, ...(item.companions || []).flatMap(companion => [companion.title, companion.details])].join(' ');
+        if (!normalize(allText).includes(query)) return '';
         const groupKeys = [mainKey, ...(item.companions || []).map((_, companionIndex) => keyFor(order.id, sectionKey, itemIndex, companionIndex))];
         const groupRead = groupKeys.filter(key => state.read[key]).length;
         const groupComplete = groupRead === groupKeys.length;
@@ -296,16 +348,21 @@
           visible++;
           const note = state.notes[key]?.trim();
           const date = state.completedAt[key];
-          return `<div class="comic-row ${companion ? 'companion-row' : ''} ${read ? 'is-read' : ''} ${current ? 'is-current' : ''}" data-key="${escapeHtml(key)}"><input class="check" type="checkbox" ${read ? 'checked' : ''} aria-label="Marcar ${escapeHtml(entry.title)} como lido"><span class="comic-copy"><strong class="comic-title">${escapeHtml(entry.title)}</strong>${entry.details ? `<span class="comic-details">${escapeHtml(entry.details)}</span>` : ''}<span class="reading-metadata">${read && date ? `<span class="read-date">✓ Lido em ${formatDate(date)}</span>` : ''}${note ? '<span class="note-saved">● Nota salva</span>' : ''}</span></span><span class="row-actions">${arcAction}<button class="note-btn ${note ? 'has-note' : ''}" type="button">${note ? '✎ Nota' : '＋ Nota'}</button><button class="current-btn" type="button">${current ? '★ Onde parei' : '☆ Marcar onde parei'}</button></span></div>`;
+          return `<div class="comic-row ${companion ? 'companion-row' : ''} ${read ? 'is-read' : ''} ${current ? 'is-current' : ''}" data-key="${escapeHtml(key)}"><input class="check" type="checkbox" ${read ? 'checked' : ''} aria-label="Marcar ${escapeHtml(entry.title)} como lido"><span class="comic-copy"><strong class="comic-title">${escapeHtml(entry.title)}</strong>${entry.details ? `<span class="comic-details">${escapeHtml(entry.details)}</span>` : ''}<span class="reading-metadata">${read && date ? `<span class="read-date">✓ Lido em ${formatDate(date)}</span>` : ''}${note ? '<span class="note-saved">● Nota salva</span>' : ''}</span></span><span class="row-actions">${arcAction}<button class="note-btn ${note ? 'has-note' : ''}" type="button">${note ? '✎ Nota' : '＋ Nota'}</button><button class="current-btn" type="button" title="${current ? 'Onde parei' : 'Marcar onde parei'}" aria-label="${current ? 'Onde parei' : 'Marcar onde parei'}: ${escapeHtml(entry.title)}">${current ? '★ Onde parei' : '☆ Marcar onde parei'}</button></span></div>`;
         };
         const main = makeRow(item, mainKey, false, groupAction);
         const companions = (item.companions || []).map((companion, companionIndex) => makeRow(companion, keyFor(order.id, sectionKey, itemIndex, companionIndex), true)).join('');
         if (!main && !companions) return '';
-        return `<article class="reading-group ${groupComplete ? 'group-complete' : groupRead ? 'group-partial' : ''}" style="--group-progress:${groupProgress}%">${main}<div class="companions">${companions}</div></article>`;
+        return `<article data-parent-key="${escapeHtml(mainKey)}" data-keys="${escapeHtml(groupKeys.join('|'))}" class="reading-group ${groupComplete ? 'group-complete' : groupRead ? 'group-partial' : ''}" style="--group-progress:${groupProgress}%">${main}${companions ? `<details class="group-details" data-detail="${escapeHtml(mainKey)}" ${expandAll || query || filter !== 'all' || expandedGroups.has(mainKey) ? 'open' : ''}><summary>${(item.companions || []).length} ${(item.companions || []).length === 1 ? 'item associado' : 'itens associados'} <span>Ver detalhes</span></summary><div class="companions">${companions}</div></details>` : ''}</article>`;
       }).join('');
-      return rows ? `<section class="section-block"><h3 class="section-title">${escapeHtml(section.title)}</h3>${rows}</section>` : '';
+      return rows ? `<section class="section-block"><h3 class="section-title"><span class="phase-number">${String(sectionIndex + 1).padStart(2, '0')}</span>${escapeHtml(section.title)}</h3>${rows}</section>` : '';
     }).join('');
     $('#emptyState').hidden = visible > 0;
+    $('#visibleCount').textContent = `${visible} itens`;
+    document.querySelectorAll('.filter').forEach(button => { button.setAttribute('aria-pressed', String(button.dataset.filter === filter)); button.classList.toggle('active', button.dataset.filter === filter); });
+    document.querySelectorAll('.group-details').forEach(detail => detail.ontoggle = () => {
+      if (detail.open) expandedGroups.add(detail.dataset.detail); else expandedGroups.delete(detail.dataset.detail);
+    });
     document.querySelectorAll('.comic-row').forEach(row => {
       const check = row.querySelector('.check');
       const currentButton = row.querySelector('.current-btn');
@@ -322,15 +379,16 @@
         let parentPreserved = false;
         if (row.classList.contains('companion-row')) {
           const group = row.closest('.reading-group');
-          const parent = group?.querySelector(':scope > .comic-row');
-          const children = [...(group?.querySelectorAll('.companion-row') || [])];
-          if (parent && children.length) {
-            const wasMarked = Boolean(state.read[parent.dataset.key]);
-            const allMarked = children.every(child => Boolean(state.read[child.dataset.key]));
-            if (allMarked) { state.read[parent.dataset.key] = true; if (!state.completedAt[parent.dataset.key]) state.completedAt[parent.dataset.key] = completedNow; parentAutoMarked = !wasMarked; }
+          const parentKey = group?.dataset.parentKey;
+          const childKeys = (group?.dataset.keys || '').split('|').slice(1);
+          if (parentKey && childKeys.length) {
+            const wasMarked = Boolean(state.read[parentKey]);
+            const allMarked = childKeys.every(key => Boolean(state.read[key]));
+            if (allMarked) { state.read[parentKey] = true; if (!state.completedAt[parentKey]) state.completedAt[parentKey] = completedNow; parentAutoMarked = !wasMarked; }
             else if (wasMarked) parentPreserved = true;
           }
         }
+
         save();
         renderNav();
         renderOrder();
@@ -379,14 +437,15 @@
     const entries = readableEntriesFor(order);
     const unread = entries.filter(entry => !state.read[entry.key]);
     if (!unread.length) { toast('Esta ordem já está concluída'); return; }
-    const currentIndex = entries.findIndex(entry => entry.key === state.current[order.id]);
-    const target = currentIndex >= 0 && !state.read[entries[currentIndex].key] ? entries[currentIndex] : entries.slice(currentIndex + 1).find(entry => !state.read[entry.key]) || unread[0];
+    const target = nextEntry(order);
     query = ''; era = 'all'; filter = 'all'; $('#searchInput').value = '';
     document.querySelectorAll('.filter').forEach(button => button.classList.toggle('active', button.dataset.filter === 'all'));
     renderOrder();
     requestAnimationFrame(() => {
       const row = [...document.querySelectorAll('.comic-row')].find(element => element.dataset.key === target.key);
       if (!row) return;
+      const details = row.closest('details');
+      if (details) { details.open = true; expandedGroups.add(details.dataset.detail); }
       row.classList.add('next-target');
       row.scrollIntoView({ behavior: 'smooth', block: 'center' });
       setTimeout(() => row.classList.remove('next-target'), 2400);
@@ -419,7 +478,7 @@
   document.querySelectorAll('.filter').forEach(button => button.onclick = () => { filter = button.dataset.filter; document.querySelectorAll('.filter').forEach(item => item.classList.toggle('active', item === button)); renderOrder(); });
   document.querySelectorAll('.shelf-tab').forEach(button => button.onclick = () => { shelfView = button.dataset.shelf; renderFeatured(); });
   $('#eraFilter').onchange = event => { era = event.target.value; renderOrder(); };
-  $('#searchInput').oninput = event => { query = event.target.value.trim().toLowerCase(); renderOrder(); };
+  $('#searchInput').oninput = event => { query = normalize(event.target.value.trim()); renderOrder(); };
   $('#nextUnreadBtn').onclick = goToNextUnread;
   $('#favoriteOrderBtn').onclick = () => toggleOrderCollection(state.favoriteOrders, 'Ordem adicionada às favoritas', 'Ordem removida das favoritas');
   $('#queueOrderBtn').onclick = () => toggleOrderCollection(state.queueOrders, 'Ordem adicionada à sua pilha', 'Ordem removida da sua pilha');
@@ -442,10 +501,14 @@
     if (!file) return;
     try {
       const data = JSON.parse(await file.text());
-      const imported = blankState(data.progress || data);
+      if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Backup inválido');
+      if (data.schema && data.schema !== 'minha-pilha-progress') throw new Error('Backup de outro app');
+      const imported = validateProgress(data.progress || data);
       ensureCompletionDates(imported, data.exportedAt || imported.savedAt || new Date().toISOString());
       Object.keys(state).forEach(key => delete state[key]);
       Object.assign(state, imported);
+      selected = orders.some(order => order.id === state.lastSelectedOrder) ? state.lastSelectedOrder : selected;
+      query = ''; era = 'all'; filter = 'all'; $('#searchInput').value = '';
       save(); render(); toast('Backup restaurado');
     } catch { toast('Arquivo de backup inválido'); }
     event.target.value = '';
@@ -467,6 +530,45 @@
   window.addEventListener('appinstalled', () => { $('#installBtn').hidden = true; toast('Minha Pilha instalada'); });
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).catch(() => {}));
 
+  function nextEntry(order) {
+    const entries = readableEntriesFor(order);
+    const unread = entries.filter(entry => !state.read[entry.key]);
+    const index = entries.findIndex(entry => entry.key === state.current[order.id]);
+    return index >= 0 && !state.read[entries[index].key] ? entries[index] : entries.slice(index + 1).find(entry => !state.read[entry.key]) || unread[0];
+  }
+  function showView(view, scroll = true) {
+    const shelf = view === 'shelf';
+    $('#libraryPanel').hidden = shelf;
+    $('#shelfPanel').hidden = !shelf;
+    $('#libraryViewBtn').classList.toggle('active', !shelf);
+    $('#shelfViewBtn').classList.toggle('active', shelf);
+    $('#libraryViewBtn').setAttribute('aria-pressed', String(!shelf));
+    $('#shelfViewBtn').setAttribute('aria-pressed', String(shelf));
+    if (scroll) window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  $('#libraryViewBtn').onclick = () => showView('library');
+  $('#shelfViewBtn').onclick = () => showView('shelf');
+  $('.brand').onclick = event => { event.preventDefault(); showView('library'); };
+  $('#restoreBtn').onclick = () => $('#importInput').click();
+  $('#mobileNavBtn').onclick = () => {
+    const open = $('#sidebar').classList.toggle('nav-open');
+    $('#mobileNavBtn').setAttribute('aria-expanded', String(open));
+    if (open) $('#navSearch').focus();
+  };
+  $('#navSearch').oninput = event => { navQuery = normalize(event.target.value.trim()); renderNav(); };
+  $('#expandAllBtn').onclick = () => {
+    expandAll = !expandAll;
+    if (!expandAll) expandedGroups.clear();
+    $('#expandAllBtn').textContent = expandAll ? 'Recolher detalhes' : 'Expandir detalhes';
+    $('#expandAllBtn').setAttribute('aria-pressed', String(expandAll));
+    renderOrder();
+  };
+  $('#clearFiltersBtn').onclick = () => { filter = 'all'; query = ''; era = 'all'; $('#searchInput').value = ''; renderOrder(); };
+  document.addEventListener('keydown', event => {
+    if (event.key === '/' && !event.ctrlKey && !event.metaKey && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName) && !$('#noteDialog').open) {
+      event.preventDefault(); showView('library', false); $('#searchInput').focus();
+    }
+  });
   render();
   if (recoveredFromBackup) setTimeout(() => toast('Progresso recuperado do backup automático'), 500);
 })();

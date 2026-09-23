@@ -1,55 +1,42 @@
-# Minha Pilha
+# Minha Pilha — Edição 02
 
-Checklist pessoal de ordens de leitura de quadrinhos, pronto para GitHub Pages.
+Versão atualizada da biblioteca pessoal de quadrinhos, pronta para abrir no navegador ou substituir a versão anterior no GitHub Pages.
 
-## Usar localmente
+## Abrir
 
-Abra `index.html` no navegador. O progresso é salvo automaticamente no armazenamento desse navegador, com uma segunda cópia interna de segurança. Use **Salvar backup** para baixar uma cópia e **Restaurar** para levá-la a outro navegador.
+Extraia o ZIP e abra **index.html**. Mantenha os arquivos juntos na mesma pasta. A prévia aberta no Codex funciona enquanto o servidor local estiver ativo; o pacote funciona independentemente dessa prévia.
 
-## Recursos pessoais
+## O que mudou
 
-- Checklist com marcação automática entre volumes e subitens.
-- Botão “Marcar tudo” com contador e progresso visual para cada arco.
-- Ponto de leitura, próxima HQ não lida e filtro por era/fase.
-- Estante de ordens em andamento, favoritas e “Quero ler”.
-- Notas pessoais e data de conclusão em cada item.
-- Backup em JSON, lembrete de cópia externa e recuperação interna automática.
-- Funcionamento offline e instalação como aplicativo quando o navegador oferecer essa opção.
-- Tema de cores automático de acordo com o personagem ou equipe selecionada.
+- Biblioteca lateral com busca por personagem, editora e ordem.
+- Tela de leitura direta, com próximo item e ponto de leitura em destaque.
+- Itens associados recolhíveis e opção de expandir todos os detalhes.
+- Estante separada em andamento, favoritas e quero ler.
+- Interface adaptada a celular e computador, navegação por teclado e atalho `/` para busca.
+- Correção da próxima leitura para incluir a obra principal, mesmo quando há itens associados.
+- Validação dos backups antes de restaurar e aviso quando o navegador não consegue salvar.
 
-## Publicar no GitHub Pages
+As 107 ordens e os 5.587 itens foram preservados. Esta atualização é da interface e do funcionamento; não é uma revisão bibliográfica do catálogo. Títulos e descrições da fonte permanecem no idioma original. A contagem inclui itens principais e associados, conforme a versão anterior.
 
-1. Envie todos os arquivos desta pasta para a raiz de um repositório no GitHub.
-2. No repositório, abra **Settings → Pages**.
-3. Em **Build and deployment**, selecione **Deploy from a branch**, a branch principal e a pasta `/ (root)`.
-4. Salve e aguarde o endereço público aparecer.
+## Trazer o progresso anterior
 
-## Adicionar novas ordens no futuro
+1. Na versão anterior, use **Salvar backup**.
+2. Nesta versão, use **Restaurar** e selecione o JSON.
 
-Coloque os novos HTMLs salvos da mesma fonte dentro da pasta `fontes/` e execute:
+Os backups anteriores continuam compatíveis. Quando a versão é atualizada no mesmo endereço e navegador, o progresso existente continua acessível. Abrir em outro endereço, outro navegador ou outra pasta pode exigir restauração do backup. O progresso é local, sem sincronização automática entre dispositivos.
 
-```powershell
-python ferramentas/importar_html.py
-```
+## Leitura e notas
 
-O arquivo `data.js` será reconstruído. Os identificadores são derivados dos títulos; assim, o progresso das ordens já existentes continua válido enquanto seus títulos não forem alterados.
+Marque a caixa de um item quando terminar. Use a bandeirinha para guardar onde parou e **Nota** para registrar comentários. **Marcar tudo** atua no grupo completo. Como antes, concluir todos os itens associados marca também o principal; desmarcar um associado mantém a marcação principal.
 
-## Estrutura
+## Offline e instalação
 
-- `index.html`: interface.
-- `styles.css`: visual responsivo.
-- `app.js`: checklist, estante pessoal, notas, datas, busca, filtros, backup e armazenamento local.
-- `data.js`: ordens extraídas dos HTMLs fornecidos.
-- `expanded-data.js`: ordens adicionais pesquisadas para a biblioteca.
-- `deep-expansions.js`: detalhamento de fases, crossovers e títulos paralelos.
-- `volume-audit.js`: agrupamento das runs por volumes e personagens da expansão mais recente.
-- `library-wave-3.js`: personagens adicionais, equipes, mutantes e universos alternativos, sempre divididos por fases e volumes.
-- `library-wave-4.js`: última expansão da biblioteca, com jovens heróis, núcleo urbano e cósmico da Marvel, mais mutantes, Aranhas e equipes e personagens clássicos da DC.
-- `library-wave-5.js`: ordem completa do Doutor Destino, da origem clássica a *One World Under Doom*.
-- `enhancements.css`: acabamento visual da estante, notas, filtros e navegação de leitura.
-- `character-themes.js` e `character-themes.css`: paletas dinâmicas de personagens, equipes e editoras.
-- `manifest.webmanifest`, `app-icon.svg` e `sw.js`: instalação e funcionamento offline.
-- `fontes/`: local para novos HTMLs.
-- `ferramentas/importar_html.py`: importador sem dependências externas.
+Quando servido por HTTPS ou localhost, o app mantém os arquivos disponíveis offline após o primeiro carregamento completo. A instalação aparece quando o navegador oferece suporte. Abrir diretamente o arquivo HTML permite o uso local, mas não instala o aplicativo.
 
-As listas originais foram preservadas como referência de ordem. Links de fonte apontam para o Comic Book Treasury quando disponíveis.
+## GitHub Pages
+
+Envie o conteúdo desta pasta para o repositório da versão anterior, mantendo o endereço usado anteriormente. Em **Settings → Pages**, mantenha a publicação pela branch e pasta configuradas. Guarde um backup JSON antes de trocar os arquivos.
+
+## Adicionar ordens
+
+O importador original continua disponível em `ferramentas/importar_html.py`. A pasta `fontes/` preserva os arquivos de referência. Não altere IDs, chaves de seções ou índices de itens existentes sem migrar o progresso.

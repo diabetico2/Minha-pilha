@@ -1,6 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Minha Pilha">
-  <rect width="512" height="512" rx="112" fill="#08090d"/>
-  <path d="M91 104h350l-44 304H47z" fill="#ed3042"/>
-  <path d="M128 153h232v42H128zm0 82h194v42H128zm0 82h232v42H128z" fill="#f5f1e8"/>
-  <circle cx="385" cy="256" r="31" fill="#d8b46a"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" rx="40" fill="#edcf70"/><text x="96" y="123" text-anchor="middle" font-family="Georgia,serif" font-size="89" font-weight="bold" letter-spacing="-8" fill="#101113">mp.</text></svg>
