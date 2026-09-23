@@ -5,8 +5,11 @@
     return { ...order, publisher: 'DC', family: 'Batman' };
   };
   const orders = [...(window.COMIC_ORDERS || []), ...(window.EXPANDED_ORDERS || [])].map(classify);
-  const KEY = 'minha-pilha-v1';
-  const AUTO_BACKUP_KEY = 'minha-pilha-v1-auto-backup';
+  let KEY = 'minha-pilha-v1';
+  let AUTO_BACKUP_KEY = 'minha-pilha-v1-auto-backup';
+  let accountId = null;
+  let applyingRemote = false;
+  const accountMemory = new Map();
   let recoveredFromBackup = false;
   let storageWarning = false;
   const expandedGroups = new Set();
@@ -87,6 +90,7 @@
 
   function save() {
     state.savedAt = new Date().toISOString();
+    if (!applyingRemote) window.PilhaCloud?.changed(state);
     const serialized = JSON.stringify(state);
     try {
       const previous = localStorage.getItem(KEY);
@@ -533,7 +537,8 @@
     event.target.value = '';
   };
   $('#resetBtn').onclick = () => {
-    if (!confirm('Apagar leituras, notas, favoritos e toda a sua estante neste navegador?')) return;
+    const scope = accountId ? 'na sua conta e nos dispositivos sincronizados' : 'neste navegador';
+    if (!confirm(`Apagar leituras, notas, favoritos e toda a sua estante ${scope}?`)) return;
     Object.keys(state).forEach(key => delete state[key]);
     Object.assign(state, blankState());
     save(); render(); toast('Sua estante foi limpa');
@@ -588,6 +593,42 @@
       event.preventDefault(); showView('library', false); $('#searchInput').focus();
     }
   });
+  window.PilhaApp = {
+    getProgress: () => JSON.parse(JSON.stringify(state)),
+    validate: validateProgress,
+    empty: blankState,
+    guestProgress() {
+      if (accountId === null) return this.getProgress();
+      if (accountMemory.has(null)) return JSON.parse(JSON.stringify(accountMemory.get(null)));
+      for (const key of ['minha-pilha-v1', 'minha-pilha-v1-auto-backup']) {
+        try { const raw = localStorage.getItem(key); if (raw) return validateProgress(JSON.parse(raw)); } catch {}
+      }
+      return blankState();
+    },
+    setAccount(uid) {
+      uid = uid || null;
+      if (accountId === uid) return this.getProgress();
+      accountMemory.set(accountId, this.getProgress());
+      accountId = uid || null;
+      KEY = uid ? `minha-pilha-account:${uid}` : 'minha-pilha-v1';
+      AUTO_BACKUP_KEY = `${KEY}-auto-backup`;
+      if ($('#noteDialog').open) $('#noteDialog').close();
+      Object.keys(state).forEach(key => delete state[key]);
+      Object.assign(state, accountMemory.has(accountId) ? JSON.parse(JSON.stringify(accountMemory.get(accountId))) : load());
+      selected = orders.some(order => order.id === state.lastSelectedOrder) ? state.lastSelectedOrder : orders[0]?.id;
+      query = ''; era = 'all'; filter = 'all'; $('#searchInput').value = '';
+      render();
+      return this.getProgress();
+    },
+    applyCloud(progress) {
+      const incoming = validateProgress(progress);
+      // Selection and external-backup dates belong to this device.
+      for (const field of ['read', 'current', 'notes', 'favoriteOrders', 'queueOrders', 'completedAt']) state[field] = incoming[field];
+      applyingRemote = true;
+      try { save(); render(); } finally { applyingRemote = false; }
+    },
+    toast
+  };
   render();
   if (recoveredFromBackup) setTimeout(() => toast('Progresso recuperado do backup automático'), 500);
 })();

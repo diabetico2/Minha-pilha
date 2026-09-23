@@ -1,8 +1,13 @@
-const CACHE_NAME = 'minha-pilha-v9';
+const CACHE_NAME = 'minha-pilha-v10';
 const CORE_FILES = [
   './',
   './index.html',
   './styles.css',
+  './cloud-sync.css',
+  './firebase-config.js',
+  './sync-model.js',
+  './cloud-sync.js',
+  './vendor/firebase.js',
   './app-icon.svg',
   './manifest.webmanifest',
   './data.js',

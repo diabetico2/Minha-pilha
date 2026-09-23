@@ -1,0 +1,52 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "piles": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "read": {
+          "$key": {
+            ".validate": "newData.isBoolean()"
+          },
+          ".validate": "newData.hasChildren()"
+        },
+        "favoriteOrders": {
+          "$key": {
+            ".validate": "newData.isBoolean()"
+          },
+          ".validate": "newData.hasChildren()"
+        },
+        "queueOrders": {
+          "$key": {
+            ".validate": "newData.isBoolean()"
+          },
+          ".validate": "newData.hasChildren()"
+        },
+        "current": {
+          "$key": {
+            ".validate": "newData.isString() && newData.val().length <= 1000"
+          },
+          ".validate": "newData.hasChildren()"
+        },
+        "notes": {
+          "$key": {
+            ".validate": "newData.isString() && newData.val().length <= 2000"
+          },
+          ".validate": "newData.hasChildren()"
+        },
+        "completedAt": {
+          "$key": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          ".validate": "newData.hasChildren()"
+        },
+        "$other": {
+          ".validate": false
+        },
+        ".validate": "newData.hasChildren()"
+      }
+    }
+  }
+}

@@ -32,7 +32,15 @@ As novas ordens mantêm a organização por editora, universo, fases, volumes e 
 1. Na versão anterior, use **Salvar backup**.
 2. Nesta versão, use **Restaurar** e selecione o JSON.
 
-Os backups anteriores continuam compatíveis. Quando a versão é atualizada no mesmo endereço e navegador, o progresso existente continua acessível. Abrir em outro endereço, outro navegador ou outra pasta pode exigir restauração do backup. O progresso é local, sem sincronização automática entre dispositivos.
+Os backups anteriores continuam compatíveis. Quando a versão é atualizada no mesmo endereço e navegador, o progresso existente continua acessível. Sem login, o progresso fica apenas no navegador.
+
+## Conta e sincronização
+
+A integração com Firebase está preparada, mas precisa de um projeto configurado para funcionar. Consulte [FIREBASE.md](FIREBASE.md) para ativar Authentication e Realtime Database no plano gratuito e publicar as regras que isolam cada usuário.
+
+Depois de ativada, use **Entrar** para criar sua conta ou entrar com e-mail e senha. No dispositivo com a pilha antiga, use **Adicionar pilha deste navegador** uma vez. Depois, use a mesma conta nos demais dispositivos. O JSON continua disponível como backup opcional.
+
+Testes da lógica de sincronização: `node tests/sync.test.cjs`. Esses testes usam um serviço simulado; a conexão e as regras precisam ser verificadas no projeto Firebase antes da ativação pública.
 
 ## Leitura e notas
 

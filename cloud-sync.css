@@ -1,0 +1,11 @@
+.cloud-status{font-size:12px;line-height:1.5;color:var(--red);margin:0 0 12px;overflow-wrap:anywhere}
+.account-dialog label{display:block;font-size:13px;margin:18px 0 7px;color:#c4cbd6}
+.account-dialog input{width:100%;padding:12px;border:1px solid #424955;border-radius:6px;background:#111419;color:#ecf0f6;font:inherit}
+.account-dialog p{font-size:14px;line-height:1.6;color:#b8c0cd;overflow-wrap:anywhere}
+.account-actions{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0}
+.account-actions button,#importGuestBtn{padding:11px 15px;border-radius:6px;font-size:14px}
+.account-actions button:disabled{opacity:.5;cursor:wait}
+#guestImportPanel{border-top:1px solid #424955;padding-top:12px}
+#accountIdentity{font-weight:600;color:#ecf0f6}
+@media(max-width:800px){.sidebar-bottom>.cloud-status{display:block;flex-basis:100%;margin:0}.top-caption{display:none}}
+@media(max-width:520px){.topbar{height:auto;min-height:72px;flex-wrap:wrap;padding-top:10px;padding-bottom:10px}.top-actions{margin-left:auto;flex-wrap:wrap}.top-actions .icon-button{font-size:11px;padding:7px}.brand small{display:none}.account-dialog{max-height:90dvh;overflow:auto}}
