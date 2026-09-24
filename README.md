@@ -8,6 +8,11 @@ Extraia o ZIP e abra **index.html**. Mantenha os arquivos juntos na mesma pasta.
 
 ## O que mudou
 
+- Página **Início** com capas dos personagens e histórias, busca, filtros e acesso à leitura em andamento.
+- **Meu perfil** com nome, foto, apresentação e estatísticas de leitura, sincronizados na própria conta.
+- Troca de senha dentro do perfil: confirme a senha atual e digite a nova duas vezes. A sessão deste dispositivo permanece aberta.
+- Capas nas listas pessoais: envie JPG, PNG ou WebP, ou crie uma capa escolhendo título, cor e estilo.
+- A confirmação do botão **Excluir lista**, que já existia, explica quais dados serão removidos e o alcance entre dispositivos.
 - Biblioteca lateral com busca por personagem, editora e ordem.
 - Tela de leitura direta, com próximo item e ponto de leitura em destaque.
 - Itens associados recolhíveis e opção de expandir todos os detalhes.
@@ -50,12 +55,31 @@ Use **Criar lista** para adicionar uma HQ ou mangá, com título, descrição e 
 - As 109 ordens do catálogo padrão permanecem protegidas: os controles de edição e exclusão aparecem apenas nas listas pessoais.
 - Com login, cada lista fica na própria conta e sincroniza com os seus dispositivos. Sem login, fica neste navegador; use **Adicionar pilha deste navegador** depois de entrar para levá-la à conta.
 - **Compartilhar lista** baixa um JSON com títulos, tipo, descrição e detalhes. Não inclui conta, notas, datas de leitura ou progresso. Envie o arquivo a quem quiser.
+- A capa acompanha o JSON compartilhado. A foto, o nome e a apresentação do perfil ficam fora desse arquivo.
 - **Importar lista** abre o JSON compartilhado para revisão antes de salvar uma cópia independente. A importação adiciona uma lista; não substitui o catálogo nem o progresso. Alterar uma cópia não altera a lista de quem a enviou.
 - **Salvar backup** inclui todas as listas pessoais e o progresso. **Restaurar** substitui a pilha inteira pelo backup; um backup antigo sem listas pessoais restaura apenas o que está nesse arquivo.
 
 Limites: 100 listas pessoais por pilha, 500 itens por lista e até 200 mil caracteres na representação de cada lista. Dois dispositivos podem alterar listas diferentes normalmente. Se uma lista mudar enquanto o editor estiver aberto, ele pede que você reabra a versão atual; edições simultâneas ainda não recebidas seguem a última gravação no servidor.
 
-Testes: `node tests/personal-library.test.cjs` e `node tests/sync.test.cjs`. Ao publicar esta versão, atualize primeiro as regras do Firebase com `database.rules.json`, que acrescenta `customOrders` dentro do caminho privado de cada conta.
+Testes: `node tests/personal-library.test.cjs` e `node tests/sync.test.cjs`. Ao publicar esta versão, atualize primeiro as regras do Firebase com `database.rules.json`, que inclui `customOrders` e `profile` dentro do caminho privado de cada conta.
+
+## Perfil e imagens
+
+Entre na conta e clique no seu nome ou em **Meu perfil**. Escolha a foto, preencha o nome e a apresentação e clique em **Salvar perfil**. Fotos são recortadas para 192 × 192 e capas para 480 × 320, reduzidas no navegador e guardadas no Realtime Database. O arquivo de origem pode ter até 8 MB; o resultado tem limite de 32 mil caracteres para fotos e 100 mil para capas. Não é necessário ativar Firebase Storage ou um plano pago.
+
+As imagens do catálogo vêm das páginas usadas como fonte das ordens, com crédito e link em cada cartão. Dependem de conexão e disponibilidade da fonte; quando não carregam, o cartão mantém título e acesso à leitura. O catálogo e suas chaves de progresso não foram alterados.
+
+O backup completo em JSON (versão 5) inclui o perfil, as listas com capas e o progresso. Backups antigos continuam válidos; restaurar substitui a pilha pelos dados presentes no arquivo. **Limpar minha estante** preserva o perfil.
+
+## Recuperação de senha
+
+Em **Entrar → Esqueci minha senha**, informe seu e-mail. Procure também na pasta Spam/Lixo eletrônico pelo remetente `noreply@minha-pilha-diabetico2.firebaseapp.com` e marque a mensagem legítima como **Não é spam**. O envio continua pelo Firebase; a aplicação não consegue garantir a classificação feita pelo provedor de e-mail.
+
+O idioma padrão foi configurado para português (Brasil). Em 24/09/2026, o console recusou a personalização do modelo deste projeto, com a mensagem “As atualizações de modelos de e-mail não estão disponíveis para este projeto” e indicação de contato com o suporte. O remetente e o texto continuam sendo os modelos padrão; nenhum serviço pago foi ativado.
+
+## Backup anterior à atualização de perfis
+
+A versão estável anterior foi preservada na tag Git `backup/pre-perfis-80da19a`, baseada no commit `80da19a2d84eda2feccbb1c56d35fe8bcc336d4d`, e no ZIP `minha-pilha-antes-dos-perfis-80da19a.zip`. Esse é um backup do código; use **Salvar backup** para uma cópia dos dados da sua conta. Antes de voltar ao código antigo, exporte os dados atuais: a versão anterior não conhece o campo de perfil.
 
 ## Leitura e notas
 

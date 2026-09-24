@@ -94,7 +94,24 @@
     catch { s.volatile.set(key, record); s.storageFailed = true; }
     refreshStatus(s); schedule(s);
   }
-  window.PilhaCloud = { changed };
+  window.PilhaCloud = {
+    changed,
+    user: () => auth?.currentUser ? { uid: auth.currentUser.uid, email: auth.currentUser.email } : null,
+    openAccount() { updateAccountUI(auth?.currentUser); window.PilhaProfileUI?.open(); dialog.showModal(); },
+    async changePassword(current, next) {
+      const user = auth?.currentUser;
+      if (!available || !user) throw Error('Entre na sua conta primeiro.');
+      if (!current || typeof next !== 'string' || next.length < 8 || next.length > 128) throw Error('Use uma nova senha de 8 a 128 caracteres.');
+      if (current === next) throw Error('Escolha uma senha diferente da atual.');
+      try {
+        await authAPI.reauthenticateWithCredential(user, authAPI.EmailAuthProvider.credential(user.email, current));
+        if (auth.currentUser?.uid !== user.uid) throw Error('A conta mudou. Tente novamente.');
+        await authAPI.updatePassword(user, next);
+      } catch (error) {
+        throw Error(({ 'auth/invalid-credential':'A senha atual está incorreta.', 'auth/wrong-password':'A senha atual está incorreta.', 'auth/too-many-requests':'Muitas tentativas. Aguarde um pouco.', 'auth/network-request-failed':'Confira sua conexão e tente novamente.', 'auth/requires-recent-login':'Confirme a senha atual e tente novamente.', 'auth/weak-password':'Escolha uma senha mais forte, com pelo menos 8 caracteres.' })[error.code] || (error.code ? 'Não foi possível alterar a senha. Tente novamente.' : error.message));
+      }
+    }
+  };
   function hasProgress(progress) { return model.fields.some(field => Object.keys(progress[field] || {}).length); }
   function updateAccountUI(user) {
     button.textContent = user ? 'Minha conta' : 'Entrar';
@@ -104,6 +121,7 @@
     $('#guestImportPanel').hidden = !user || !hasProgress(app.guestProgress());
     $('#accountPassword').value = '';
     message(user ? 'Cada conta tem sua própria pilha.' : available ? 'Entre para continuar a leitura em outro dispositivo.' : 'A sincronização ainda não foi ativada. Sua pilha continua salva neste navegador.');
+    window.PilhaProfileUI?.userChanged(user);
   }
   function switchUser(user) {
     const previous = session;
@@ -154,13 +172,13 @@
     } catch (error) { message(errorMessage(error)); }
     finally { controls.forEach(control => control.disabled = false); }
   }
-  button.onclick = () => { updateAccountUI(auth?.currentUser); dialog.showModal(); };
+  button.onclick = () => window.PilhaCloud.openAccount();
   $('#loginForm').onsubmit = event => { event.preventDefault(); authenticate(false); };
   $('#createAccountBtn').onclick = () => authenticate(true);
   $('#resetPasswordBtn').onclick = async () => {
     if (!available || !$('#accountEmail').reportValidity()) return;
     const control = $('#resetPasswordBtn'); control.disabled = true;
-    try { await authAPI.sendPasswordResetEmail(auth, $('#accountEmail').value.trim()); message('Se houver uma conta para esse e-mail, você receberá as instruções de recuperação.'); }
+    try { await authAPI.sendPasswordResetEmail(auth, $('#accountEmail').value.trim()); message('Se houver uma conta para esse e-mail, você receberá as instruções para redefinir a senha. Confira também Spam/Lixo eletrônico e procure o remetente noreply@minha-pilha-diabetico2.firebaseapp.com. Se a mensagem estiver no spam, marque “Não é spam”.'); }
     catch (error) { message(errorMessage(error)); }
     finally { control.disabled = false; }
   };
@@ -193,7 +211,7 @@
     if (!config?.apiKey || !config?.databaseURL || !config?.projectId) return;
     setStatus('Conectando sua conta…');
     try {
-      const firebase = await import('./vendor/firebase.js');
+      const firebase = await import('./vendor/firebase.js?v=15');
       const instance = firebase.initializeApp(config);
       authAPI = firebase; dataAPI = firebase;
       auth = authAPI.getAuth(instance); auth.languageCode = 'pt-BR';

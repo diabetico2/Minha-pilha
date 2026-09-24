@@ -47,6 +47,16 @@ Se a conta já tem leituras que você quer preservar, salve um backup dela antes
 - **Limpar minha estante**, enquanto conectado, limpa também os itens conhecidos na conta. A confirmação informa esse alcance. O backup JSON continua disponível como cópia adicional.
 - Senhas são processadas pelo Firebase Authentication; não são armazenadas na pilha nem no código do site.
 
+### Perfil, foto e troca de senha
+
+`/piles/UID/profile` armazena `displayName` (até 60 caracteres), `bio` (até 280) e `avatar` (JPEG, PNG ou WebP em data URL, até 32 mil caracteres). Assim como os demais mapas, os nomes dos campos são codificados em hexadecimal UTF-8 no banco. As regras aceitam apenas esses campos e mantêm leitura/escrita restritas ao proprietário. A capa opcional de uma lista fica dentro de seu JSON em `customOrders`, com limite de 100 mil caracteres.
+
+Não há Storage, upload público ou diretório público de perfis. O navegador recorta/reduz as imagens antes do envio e o banco usa o plano Spark existente. O backup completo inclui o perfil; o JSON de compartilhamento inclui só a lista e sua capa. A limpeza da estante preserva o perfil.
+
+A troca de senha usa `reauthenticateWithCredential` com a senha atual, confere se a conta continua a mesma e então chama `updatePassword`. A senha não passa pelo Realtime Database, cache da pilha ou fila offline. Referência: [gerenciar usuários no Firebase Auth](https://firebase.google.com/docs/auth/web/manage-users).
+
+O console está configurado para enviar modelos em português (Brasil), e o SDK também define `auth.languageCode = 'pt-BR'`. A personalização do remetente, assunto e mensagem foi recusada pelo console deste projeto em 24/09/2026 (aviso de indisponibilidade da edição); por isso, não considerar esse modelo personalizado como publicado. Resolver pelo suporte do Firebase antes de tentar novamente. O site orienta a procurar o remetente padrão no spam. Um domínio próprio de envio exige domínio e registros DNS sob controle do proprietário; não foi contratado nenhum domínio ou serviço. Referência: [domínio para e-mails de autenticação](https://firebase.google.com/docs/auth/email-custom-domain).
+
 ### Listas pessoais
 
 O campo `customOrders` fica em `/piles/UID/customOrders`, protegido pelas mesmas regras de proprietário. Cada entrada é uma lista serializada como JSON, com limite de 200 mil caracteres e identificador `personal-UUID`. Os itens têm identificadores estáveis; trocar o título ou a posição não desloca o progresso para outro volume. O catálogo padrão permanece nos arquivos estáticos e não pode ser sobrescrito por uma lista importada.

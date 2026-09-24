@@ -11,8 +11,8 @@ let passed = 0;
 function test(name, run) { run(); passed++; console.log(`PASS ${name}`); }
 function bridge() {
   const builtInOrders=[{id:'batman', title:'Batman', sections:[{key:4, title:'Fase', items:[{title:'Batman #1'}]}]}];
-  const c={window:{PilhaPersonal:model}, builtInOrders, orders:builtInOrders, accountId:null,accountMemory:new Map(),selected:'batman',applyingRemote:false,
-    $:()=>({open:false,value:''}),load:()=>c.blankState(),render(){},save(){},toast(){},localStorage:{getItem:()=>null},
+  const c={window:{PilhaPersonal:model,PilhaProfileModel:require('../profile-model.js')}, builtInOrders, orders:builtInOrders, accountId:null,accountMemory:new Map(),selected:'batman',applyingRemote:false,
+    $:()=>({open:false,value:''}),load:()=>c.blankState(),showView(){},render(){},save(){},toast(){},localStorage:{getItem:()=>null},
     keyFor:(order,section,item)=>`${order}:${section}:${item}`,selectOrder:id=>{c.selected=id}};
   vm.createContext(c);
   vm.runInContext(source.slice(source.indexOf('  function refreshOrders('),source.indexOf('  function ensureCompletionDates(')),c);
@@ -58,6 +58,25 @@ test('personal create/edit/reorder preserves item marks, notes and reading point
 });
 test('built-in catalogue cannot be edited or deleted through the personal bridge',()=>{
   const c=bridge(),app=c.window.PilhaApp,list=fixture();assert.throws(()=>app.personal.save({...list,id:'batman'}));assert.throws(()=>app.personal.remove('batman',null));assert.equal(c.orders.length,1);
+});
+
+test('covers survive sharing and independent import without exposing profile or progress',()=>{
+  const list=fixture();list.cover='data:image/jpeg;base64,AAAA';list.profile={displayName:'private'};
+  const shared=model.share(list),copy=model.importShare(shared,makeId);
+  assert.equal(copy.cover,list.cover);assert.notEqual(copy.id,list.id);assert.equal(JSON.stringify(shared).includes('private'),false);
+  for(const cover of ['https://example.com/tracker.png','data:image/svg+xml;base64,AAAA','javascript:alert(1)','data:image/png;base64,'+'A'.repeat(100000)])assert.throws(()=>model.validate({...list,cover}));
+  const c=bridge(),app=c.window.PilhaApp;app.personal.save(list);const key=`${list.id}:personal:${list.items[0].id}`;c.state.read[key]=true;
+  app.personal.save({...list,cover:'data:image/webp;base64,BBBB'},app.personal.get(list.id));assert.equal(c.state.read[key],true);assert.equal(model.parse(app.personal.get(list.id)).cover,'data:image/webp;base64,BBBB');
+});
+
+test('profiles validate, back up and switch accounts independently',()=>{
+  const c=bridge(),app=c.window.PilhaApp,profile={displayName:'Leitora',bio:'HQs e mangás',avatar:'data:image/png;base64,AAAA'};
+  assert.throws(()=>app.saveProfile(profile),/conta/);app.setAccount('alice');app.saveProfile(profile);
+  assert.deepEqual(clone(app.validate(app.getProgress()).profile),profile);
+  app.setAccount('bob');assert.deepEqual(clone(app.getProfile()),{});app.saveProfile({displayName:'Outro'});
+  app.setAccount('alice');assert.deepEqual(clone(app.getProfile()),profile);app.setAccount(null);assert.deepEqual(clone(app.getProfile()),{});
+  for(const invalid of [null,[],{uid:'alice'},{displayName:'a'.repeat(61)},{bio:2},{avatar:'https://example.com/image.jpg'},{avatar:'data:image/svg+xml;base64,AAAA'},JSON.parse('{"__proto__":"bad"}')])assert.throws(()=>app.validate({read:{},profile:invalid}));
+  assert.deepEqual(clone(app.validate({read:{}}).profile),{});
 });
 test('stale edits and deletions are refused after another device changes or deletes a list',()=>{
   const c=bridge(),app=c.window.PilhaApp,list=fixture();app.personal.save(list);const base=app.personal.get(list.id);

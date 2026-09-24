@@ -50,6 +50,7 @@
     if (raw.lastSelectedOrder != null && typeof raw.lastSelectedOrder !== 'string') throw new Error('Ordem inválida');
     for (const field of ['savedAt', 'lastBackupAt']) if (raw[field] != null && !isValidDate(raw[field])) throw new Error('Data inválida');
     if (raw.customOrders !== undefined) window.PilhaPersonal.validateMap(raw.customOrders);
+    if (raw.profile !== undefined) window.PilhaProfileModel.validate(raw.profile);
     return blankState(raw);
   }
   function blankState(raw = {}) {
@@ -61,6 +62,7 @@
       queueOrders: raw.queueOrders && typeof raw.queueOrders === 'object' ? raw.queueOrders : {},
       completedAt: raw.completedAt && typeof raw.completedAt === 'object' ? raw.completedAt : {},
       customOrders: raw.customOrders || {},
+      profile: raw.profile || {},
       lastSelectedOrder: typeof raw.lastSelectedOrder === 'string' ? raw.lastSelectedOrder : null,
       savedAt: raw.savedAt || null,
       lastBackupAt: raw.lastBackupAt || null
@@ -114,6 +116,8 @@
     updateStats();
     renderFeatured();
     updateSaveStatus();
+    window.PilhaHome?.refresh();
+    window.PilhaProfileUI?.refresh();
   }
 
   function counts(order) {
@@ -299,7 +303,7 @@
     render();
     document.querySelector('.library').scrollIntoView({ behavior: 'smooth' });
   }
-  function render() { renderNav(); renderOrder(); updateStats(); renderFeatured(); updateSaveStatus(); }
+  function render() { renderNav(); renderOrder(); updateStats(); renderFeatured(); updateSaveStatus(); window.PilhaHome?.refresh(); window.PilhaProfileUI?.refresh(); }
 
   function updateCollectionButtons(order) {
     const favorite = Boolean(state.favoriteOrders[order.id]);
@@ -489,7 +493,7 @@
     state.lastBackupAt = exportedAt;
     ensureCompletionDates(state, exportedAt);
     save();
-    const payload = JSON.stringify({ version: 4, schema: 'minha-pilha-progress', exportedAt, app: 'Minha Pilha', progress: blankState(state) }, null, 2);
+    const payload = JSON.stringify({ version: 5, schema: 'minha-pilha-progress', exportedAt, app: 'Minha Pilha', progress: blankState(state) }, null, 2);
     const blob = new Blob([payload], { type: 'application/json' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -552,8 +556,9 @@
   $('#resetBtn').onclick = () => {
     const scope = accountId ? 'na sua conta e nos dispositivos sincronizados' : 'neste navegador';
     if (!confirm(`Apagar leituras, notas, favoritos, listas pessoais e toda a sua estante ${scope}?`)) return;
+    const profile = state.profile;
     Object.keys(state).forEach(key => delete state[key]);
-    Object.assign(state, blankState());
+    Object.assign(state, blankState({ profile }));
     window.PilhaPersonalUI?.close();
     refreshOrders(); selected = orders[0]?.id;
     save(); render(); toast('Sua estante foi limpa');
@@ -577,17 +582,24 @@
   }
   function showView(view, scroll = true) {
     const shelf = view === 'shelf';
-    $('#libraryPanel').hidden = shelf;
+    const home = view === 'home';
+    $('#libraryPanel').hidden = shelf || home;
     $('#shelfPanel').hidden = !shelf;
-    $('#libraryViewBtn').classList.toggle('active', !shelf);
+    if ($('#homePanel')) $('#homePanel').hidden = !home;
+    $('#homeViewBtn')?.classList.toggle('active', home);
+    $('#homeViewBtn')?.setAttribute('aria-pressed', String(home));
+    $('#libraryViewBtn').classList.toggle('active', !shelf && !home);
     $('#shelfViewBtn').classList.toggle('active', shelf);
-    $('#libraryViewBtn').setAttribute('aria-pressed', String(!shelf));
+    $('#libraryViewBtn').setAttribute('aria-pressed', String(!shelf && !home));
     $('#shelfViewBtn').setAttribute('aria-pressed', String(shelf));
+    const heading = home ? '#homeTitle' : shelf ? '#currentTitle' : '#libraryTitle';
+    $('.skip-link').setAttribute('href', heading);
+    $(heading)?.setAttribute('tabindex', '-1');
     if (scroll) window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   $('#libraryViewBtn').onclick = () => showView('library');
   $('#shelfViewBtn').onclick = () => showView('shelf');
-  $('.brand').onclick = event => { event.preventDefault(); showView('library'); };
+  $('.brand').onclick = event => { event.preventDefault(); showView('home'); };
   $('#restoreBtn').onclick = () => $('#importInput').click();
   $('#mobileNavBtn').onclick = () => {
     const open = $('#sidebar').classList.toggle('nav-open');
@@ -605,13 +617,24 @@
   $('#clearFiltersBtn').onclick = () => { filter = 'all'; query = ''; era = 'all'; $('#searchInput').value = ''; renderOrder(); };
   document.addEventListener('keydown', event => {
     if (event.key === '/' && !event.ctrlKey && !event.metaKey && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName) && !document.querySelector('dialog[open]')) {
-      event.preventDefault(); showView('library', false); $('#searchInput').focus();
+      event.preventDefault();
+      if ($('#homePanel') && !$('#homePanel').hidden) $('#homeSearch').focus();
+      else { showView('library', false); $('#searchInput').focus(); }
     }
   });
   window.PilhaApp = {
     getProgress: () => JSON.parse(JSON.stringify(state)),
     validate: validateProgress,
     empty: blankState,
+    catalogue: () => orders.map(order => ({ id: order.id, title: order.title, publisher: order.publisher, family: order.family, description: order.description || '', personal: !!order.personal, cover: order.cover || '', progress: counts(order) })),
+    openOrder: selectOrder,
+    showView,
+    getProfile: () => ({ ...state.profile }),
+    saveProfile(raw) {
+      if (!accountId) throw Error('Entre na sua conta para editar o perfil.');
+      state.profile = window.PilhaProfileModel.validate(raw);
+      save(); render();
+    },
     personal: {
       get: id => state.customOrders[id] || null,
       selectedId: () => window.PilhaPersonal.isId(selected) ? selected : null,
@@ -669,7 +692,7 @@
     applyCloud(progress) {
       const incoming = validateProgress(progress);
       // Selection and external-backup dates belong to this device.
-      for (const field of ['read', 'current', 'notes', 'favoriteOrders', 'queueOrders', 'completedAt', 'customOrders']) state[field] = incoming[field];
+      for (const field of ['read', 'current', 'notes', 'favoriteOrders', 'queueOrders', 'completedAt', 'customOrders', 'profile']) state[field] = incoming[field];
       refreshOrders();
       if (!orders.some(order => order.id === selected)) selected = orders[0]?.id;
       applyingRemote = true;

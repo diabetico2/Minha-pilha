@@ -1,16 +1,22 @@
-const CACHE_NAME = 'minha-pilha-v13';
+const CACHE_NAME = 'minha-pilha-v15';
 const CORE_FILES = [
   './',
   './index.html',
   './styles.css',
-  './personal-library.css?v=13',
-  './personal-library.js?v=13',
-  './personal-library-ui.js?v=13',
-  './cloud-sync.css?v=13',
-  './firebase-config.js?v=13',
-  './sync-model.js?v=13',
-  './cloud-sync.js?v=13',
-  './vendor/firebase.js',
+  './home-profile.css?v=15',
+  './profile-model.js?v=15',
+  './media-tools.js?v=15',
+  './catalogue-covers.js?v=15',
+  './profile-ui.js?v=15',
+  './home.js?v=15',
+  './personal-library.css?v=15',
+  './personal-library.js?v=15',
+  './personal-library-ui.js?v=15',
+  './cloud-sync.css?v=15',
+  './firebase-config.js?v=15',
+  './sync-model.js?v=15',
+  './cloud-sync.js?v=15',
+  './vendor/firebase.js?v=15',
   './app-icon.svg',
   './manifest.webmanifest',
   './data.js',
@@ -22,7 +28,7 @@ const CORE_FILES = [
   './library-wave-5.js',
   './library-wave-6.js',
   './character-themes.js',
-  './app.js?v=13'
+  './app.js?v=15'
 ];
 
 self.addEventListener('install', event => {

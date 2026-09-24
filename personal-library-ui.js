@@ -3,7 +3,7 @@
   const $ = selector => document.querySelector(selector);
   const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
   const makeId = prefix => `${prefix}-${crypto.randomUUID()}`;
-  let draft = null, base = null, owner = null, generation = 0;
+  let draft = null, base = null, owner = null, generation = 0, coverBusy = false;
   const tools = document.createElement('div');
   tools.className = 'personal-tools';
   tools.innerHTML = '<button class="collection-action" id="newPersonalBtn">＋ Criar lista</button><button class="text-button" id="importPersonalBtn">Importar lista</button><input type="file" id="personalFile" accept=".json,application/json" hidden>';
@@ -19,11 +19,12 @@
     <p class="personal-help" id="personalScope"></p>
     <div class="personal-fields"><label>Título da lista<input id="personalTitle" maxlength="160" required placeholder="Ex.: Berserk — minha leitura"></label><label>Tipo<select id="personalKind"><option value="comic">Comic / HQ</option><option value="manga">Mangá</option></select></label></div>
     <label class="personal-description">Descrição <small>opcional</small><textarea id="personalDescription" maxlength="1000" rows="2" placeholder="Autor, editora ou uma breve apresentação…"></textarea></label>
+    <section class="cover-editor" aria-labelledby="coverEditorTitle"><div class="cover-preview"><img id="personalCoverPreview" alt="Prévia da capa da lista"></div><div><h3 id="coverEditorTitle">Uma capa com a sua cara</h3><p class="personal-help">Envie uma imagem ou crie uma capa com o título da lista.</p><div class="cover-upload-actions"><button class="dialog-secondary" type="button" id="uploadCoverBtn">Escolher imagem</button><button class="text-button" type="button" id="removeCoverBtn">Remover capa</button><input id="coverInput" type="file" accept="image/jpeg,image/png,image/webp" hidden></div><div class="cover-options"><label>Cor<input type="color" id="coverColor" value="#d4b76c"></label><label>Estilo<select id="coverStyle"><option value="orbit">Órbitas</option><option value="panels">Painéis</option><option value="dots">Retícula</option></select></label><button class="dialog-secondary" type="button" id="generateCoverBtn">Criar capa</button></div><p id="coverMessage" class="personal-help" role="status"></p></div></section>
     <div class="personal-items-heading"><h3>Edições, volumes ou capítulos</h3><span id="personalItemCount"></span></div><p class="personal-help">Coloque os itens na ordem em que quer ler. Renomear ou reordenar mantém suas marcações.</p>
     <div id="personalItems"></div><button class="collection-action" type="button" id="addPersonalItem">＋ Adicionar item</button>
     <details class="personal-bulk"><summary>Colar vários títulos de uma vez</summary><label for="personalBulk" class="personal-help">Um título por linha. Você pode ajustar os detalhes depois.</label><textarea id="personalBulk" rows="4" maxlength="81000" placeholder="Volume 1&#10;Volume 2&#10;Volume 3"></textarea><button class="dialog-secondary" type="button" id="addPersonalBulk">Adicionar títulos</button></details>
     <p id="personalError" class="personal-error" role="alert" hidden></p>
-    <div class="note-dialog-actions personal-footer"><span></span><button type="button" class="dialog-secondary" id="cancelPersonalBtn">Cancelar</button><button class="dialog-primary" type="submit">Salvar lista</button></div>
+    <div class="note-dialog-actions personal-footer"><button type="button" class="dialog-secondary" id="cancelPersonalBtn">Cancelar</button><button class="dialog-primary" id="savePersonalBtn" type="submit">Salvar lista</button></div>
   </form>`;
   document.body.append(dialog);
   function error(message = '') { $('#personalError').textContent = message; $('#personalError').hidden = !message; }
@@ -37,21 +38,34 @@
     if (focusId) $(`#title-${focusId}`)?.focus();
   }
   function open(list, previous, imported = false) {
-    draft = list; base = previous; owner = personal.account(); error();
+    generation++; coverBusy=false; draft = list; base = previous; owner = personal.account(); error();
     $('#personalDialogTitle').textContent = previous ? 'Editar lista' : imported ? 'Adicionar lista recebida' : 'Criar lista';
     $('#personalScope').textContent = imported ? 'Revise e salve uma cópia para você. Suas outras listas e seu progresso continuam como estão.' : owner ? 'Esta lista fica só na sua conta. Você pode compartilhar uma cópia quando quiser.' : 'Esta lista fica neste navegador. Entre na sua conta e use “Adicionar pilha deste navegador” para sincronizar.';
     $('#personalTitle').value = list.title; $('#personalKind').value = list.kind;
     $('#personalDescription').value = list.description; $('#personalBulk').value = '';
+    $('#savePersonalBtn').disabled=false;$('#coverMessage').textContent='';renderCover();
     renderItems(); dialog.showModal(); $('#personalTitle').focus();
   }
-  const close = () => { generation++; draft = null; base = null; if (dialog.open) dialog.close(); };
+  const close = () => { generation++; coverBusy=false; draft = null; base = null; if (dialog.open) dialog.close(); };
   dialog.addEventListener('close', close);
   for (const id of ['#closePersonalBtn', '#cancelPersonalBtn']) $(id).onclick = close;
   $('#newPersonalBtn').onclick = () => open({ id: makeId('personal'), title: '', kind: 'comic', description: '', items: [item()] }, null);
-  $('#editPersonalBtn').onclick = () => {
-    const id = personal.selectedId(), value = personal.get(id);
+  function edit(id) {
+    const value = personal.get(id);
     if (value) open(model.parse(value, id), value);
+  }
+  $('#editPersonalBtn').onclick = () => edit(personal.selectedId());
+  function renderCover(){ $('#personalCoverPreview').src=draft?.cover||window.PilhaMedia.cover($('#personalTitle').value,$('#coverColor').value,$('#coverStyle').value,$('#personalKind').value); }
+  $('#uploadCoverBtn').onclick=()=>$('#coverInput').click();
+  $('#coverInput').onchange=async event=>{
+    const file=event.target.files?.[0];if(!file||!draft)return;const token=++generation;coverBusy=true;$('#savePersonalBtn').disabled=true;$('#coverMessage').textContent='Preparando sua capa…';
+    try{const image=await window.PilhaMedia.readImage(file,'cover');if(token!==generation||!draft)return;draft.cover=image;renderCover();$('#coverMessage').textContent='Capa pronta para salvar.';}
+    catch(err){if(token===generation)$('#coverMessage').textContent=err.message;}
+    finally{event.target.value='';if(token===generation){coverBusy=false;$('#savePersonalBtn').disabled=false;}}
   };
+  $('#generateCoverBtn').onclick=()=>{generation++;coverBusy=false;$('#savePersonalBtn').disabled=false;draft.cover=window.PilhaMedia.cover($('#personalTitle').value,$('#coverColor').value,$('#coverStyle').value,$('#personalKind').value);renderCover();$('#coverMessage').textContent='Capa criada. Salve a lista para aplicar.';};
+  $('#removeCoverBtn').onclick=()=>{generation++;coverBusy=false;$('#savePersonalBtn').disabled=false;delete draft.cover;renderCover();$('#coverMessage').textContent='A lista usará uma capa automática.';};
+  $('#personalTitle').oninput=()=>{if(draft&&!draft.cover)renderCover();};
   $('#personalItems').oninput = event => {
     const row = event.target.closest('[data-item]');
     if (draft && row && ['title', 'details'].includes(event.target.dataset.field)) draft.items.find(entry => entry.id === row.dataset.item)[event.target.dataset.field] = event.target.value;
@@ -79,7 +93,7 @@
     $('#personalBulk').value = ''; renderItems(); error();
   };
   $('#personalForm').onsubmit = event => {
-    event.preventDefault(); if (!draft) return;
+    event.preventDefault(); if (!draft || coverBusy) return;
     try {
       if (owner !== personal.account()) throw Error('A conta mudou. Abra o editor novamente.');
       if ($('#personalBulk').value.trim()) throw Error('Clique em “Adicionar títulos” para incluir os títulos colados, ou apague esse campo.');
@@ -87,21 +101,25 @@
       close(); app.toast('Lista pessoal salva');
     } catch (err) { error(err.message); }
   };
-  $('#sharePersonalBtn').onclick = () => {
-    const id = personal.selectedId(), value = personal.get(id); if (!value) return;
+  function share(id) {
+    const value = personal.get(id); if (!value) return;
     const list = model.parse(value, id);
     const url = URL.createObjectURL(new Blob([JSON.stringify(model.share(list), null, 2)], { type: 'application/json' }));
     const link = document.createElement('a'); link.href = url;
     link.download = `minha-pilha-lista-${list.title.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/gi, '-').slice(0, 60) || 'pessoal'}.json`;
     link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     app.toast('Lista exportada, sem suas notas ou progresso. Envie o JSON a quem quiser.');
-  };
-  $('#deletePersonalBtn').onclick = () => {
-    const id = personal.selectedId(), value = personal.get(id); if (!value) return;
+  }
+  $('#sharePersonalBtn').onclick = () => share(personal.selectedId());
+  function remove(id) {
+    const value = personal.get(id); if (!value) return;
     const list = model.parse(value, id);
-    if (!confirm(`Excluir “${list.title}” e suas marcações? A exclusão vale para sua conta e seus dispositivos. Cópias compartilhadas não serão alteradas.`)) return;
-    try { personal.remove(id, value); app.toast('Lista pessoal excluída'); } catch (err) { app.toast(err.message); }
-  };
+    const scope=personal.account()?'A exclusão será sincronizada com todos os seus dispositivos.':'A exclusão vale para a pilha deste navegador.';
+    if (!confirm(`Excluir “${list.title}”?\n\nSerão removidos os ${list.items.length} itens desta lista, suas marcações e notas. ${scope}\n\nO catálogo padrão e as cópias compartilhadas não serão alterados. Para recuperar depois, salve um backup antes de excluir.`)) return;
+    try { personal.remove(id, value); close(); app.showView('home'); app.toast('Lista pessoal excluída'); } catch (err) { app.toast(err.message); }
+  }
+  $('#deletePersonalBtn').classList.add('danger-text');
+  $('#deletePersonalBtn').onclick = () => remove(personal.selectedId());
   $('#importPersonalBtn').onclick = () => $('#personalFile').click();
   $('#personalFile').onchange = async event => {
     const file = event.target.files?.[0]; if (!file) return;
@@ -114,6 +132,6 @@
     } catch (err) { app.toast(err instanceof SyntaxError ? 'O arquivo não contém um JSON válido.' : err.message); }
     finally { event.target.value = ''; }
   };
-  window.PilhaPersonalUI = { close, selected(id) { actions.hidden = !id; } };
+  window.PilhaPersonalUI = { close, edit, share, remove, selected(id) { actions.hidden = !id; } };
   window.PilhaPersonalUI.selected(personal.selectedId());
 })();

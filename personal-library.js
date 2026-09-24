@@ -17,7 +17,8 @@
       seen.add(item.id);
       return { id: item.id, title: text(item.title, 160, true), details: text(item.details ?? '', 500) };
     });
-    return { id: raw.id, title: text(raw.title, 160, true), kind: raw.kind, description: text(raw.description ?? '', 1000), items };
+    if (raw.cover !== undefined && !(typeof raw.cover === 'string' && raw.cover.length <= 100000 && (raw.cover === '' || /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(raw.cover)))) throw Error('Capa inválida. Envie uma imagem pelo editor.');
+    return { id: raw.id, title: text(raw.title, 160, true), kind: raw.kind, description: text(raw.description ?? '', 1000), items, ...(raw.cover ? { cover: raw.cover } : {}) };
   }
   function serialize(raw) {
     const result = JSON.stringify(validate(raw));
@@ -37,19 +38,19 @@
   }
   function toOrder(raw) {
     const list = validate(raw);
-    return { id: list.id, title: list.title, description: list.description || 'Uma lista da sua biblioteca pessoal.', publisher: 'Minhas listas', family: list.kind === 'manga' ? 'Mangás' : 'Comics', personal: true,
+    return { id: list.id, title: list.title, description: list.description || 'Uma lista da sua biblioteca pessoal.', publisher: 'Minhas listas', family: list.kind === 'manga' ? 'Mangás' : 'Comics', personal: true, cover: list.cover || '',
       sections: [{ key: 'personal', title: list.kind === 'manga' ? 'Volumes e capítulos' : 'Edições e volumes', items: list.items.map(item => ({ key: item.id, title: item.title, details: item.details })) }] };
   }
   function share(raw) {
     const list = validate(raw);
     // Only catalogue content leaves the device; no account, notes, reading state or internal IDs.
-    return { schema: 'minha-pilha-list', version: 1, list: { title: list.title, kind: list.kind, description: list.description, items: list.items.map(({ title, details }) => ({ title, details })) } };
+    return { schema: 'minha-pilha-list', version: 1, list: { title: list.title, kind: list.kind, description: list.description, items: list.items.map(({ title, details }) => ({ title, details })), ...(list.cover ? { cover: list.cover } : {}) } };
   }
   function importShare(raw, makeId) {
     if (!plain(raw) || raw.schema !== 'minha-pilha-list' || raw.version !== 1 || !plain(raw.list) || !Array.isArray(raw.list.items)) throw Error('Use um arquivo de lista compartilhada da Minha Pilha. Para um backup, use Restaurar.');
     if (raw.list.items.length > MAX_ITEMS) throw Error(`Importe no máximo ${MAX_ITEMS} itens por lista.`);
     const list = raw.list;
-    const result = validate({ id: makeId('personal'), title: list.title, kind: list.kind, description: list.description ?? '', items: list.items.map(item => {
+    const result = validate({ id: makeId('personal'), title: list.title, kind: list.kind, description: list.description ?? '', cover: list.cover, items: list.items.map(item => {
       if (!plain(item)) throw Error('Item inválido.');
       return { id: makeId('item'), title: item.title, details: item.details ?? '' };
     }) });

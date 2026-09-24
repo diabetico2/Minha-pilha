@@ -48,6 +48,13 @@
           },
           ".validate": "newData.hasChildren()"
         },
+        "profile": {
+          "646973706c61794e616d65": { ".validate": "newData.isString() && newData.val().length <= 60" },
+          "62696f": { ".validate": "newData.isString() && newData.val().length <= 280" },
+          "617661746172": { ".validate": "newData.isString() && newData.val().length <= 32000 && (newData.val() === '' || newData.val().matches(/^data:image\\/(jpeg|png|webp);base64,[A-Za-z0-9+\\/]+={0,2}$/))" },
+          "$other": { ".validate": false },
+          ".validate": "newData.hasChildren()"
+        },
         "$other": {
           ".validate": false
         },
