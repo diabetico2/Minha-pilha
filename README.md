@@ -42,6 +42,21 @@ Use **Entrar → Criar conta** para cadastrar e-mail e senha. No dispositivo com
 
 Testes da lógica de sincronização: `node tests/sync.test.cjs`. Além dos testes locais, foram verificados no Firebase real: cadastro e login, recebimento em outro cliente, combinação de alterações, remoção de marcações, isolamento entre contas, bloqueio de acesso sem login e validação dos dados. A importação de JSON pela interface também foi conferida no banco. Os testes reais usam contas temporárias, sem alterar pilhas pessoais.
 
+## Listas pessoais de comics e mangás
+
+Use **Criar lista** para adicionar uma HQ ou mangá, com título, descrição e edições, volumes ou capítulos na sua ordem. É possível colar vários títulos, um por linha. As listas aparecem em **Minhas listas**, no início da biblioteca, e funcionam com marcações, notas, favoritas e a estante.
+
+- **Editar lista** permite renomear, adicionar, remover e reordenar os seus itens. Renomear e reordenar preserva as marcações; remover um item apaga somente o progresso desse item.
+- As 109 ordens do catálogo padrão permanecem protegidas: os controles de edição e exclusão aparecem apenas nas listas pessoais.
+- Com login, cada lista fica na própria conta e sincroniza com os seus dispositivos. Sem login, fica neste navegador; use **Adicionar pilha deste navegador** depois de entrar para levá-la à conta.
+- **Compartilhar lista** baixa um JSON com títulos, tipo, descrição e detalhes. Não inclui conta, notas, datas de leitura ou progresso. Envie o arquivo a quem quiser.
+- **Importar lista** abre o JSON compartilhado para revisão antes de salvar uma cópia independente. A importação adiciona uma lista; não substitui o catálogo nem o progresso. Alterar uma cópia não altera a lista de quem a enviou.
+- **Salvar backup** inclui todas as listas pessoais e o progresso. **Restaurar** substitui a pilha inteira pelo backup; um backup antigo sem listas pessoais restaura apenas o que está nesse arquivo.
+
+Limites: 100 listas pessoais por pilha, 500 itens por lista e até 200 mil caracteres na representação de cada lista. Dois dispositivos podem alterar listas diferentes normalmente. Se uma lista mudar enquanto o editor estiver aberto, ele pede que você reabra a versão atual; edições simultâneas ainda não recebidas seguem a última gravação no servidor.
+
+Testes: `node tests/personal-library.test.cjs` e `node tests/sync.test.cjs`. Ao publicar esta versão, atualize primeiro as regras do Firebase com `database.rules.json`, que acrescenta `customOrders` dentro do caminho privado de cada conta.
+
 ## Leitura e notas
 
 Marque a caixa de um item quando terminar. Use a bandeirinha para guardar onde parou e **Nota** para registrar comentários. **Marcar tudo** atua no grupo completo. Como antes, concluir todos os itens associados marca também o principal; desmarcar um associado mantém a marcação principal.

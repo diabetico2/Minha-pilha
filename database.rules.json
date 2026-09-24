@@ -42,6 +42,12 @@
           },
           ".validate": "newData.hasChildren()"
         },
+        "customOrders": {
+          "$key": {
+            ".validate": "newData.isString() && newData.val().length <= 200000"
+          },
+          ".validate": "newData.hasChildren()"
+        },
         "$other": {
           ".validate": false
         },

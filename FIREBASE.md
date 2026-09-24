@@ -39,13 +39,19 @@ Se a conta já tem leituras que você quer preservar, salve um backup dela antes
 
 - A pilha sem login mantém a chave local original `minha-pilha-v1`.
 - Cada conta usa seu próprio cache local e seu próprio caminho `/piles/UID` no banco. Uma conta não pode consultar nem alterar o caminho de outra.
-- Leituras, pontos de leitura, notas, favoritas, fila e datas de leitura são sincronizados. A página selecionada e a data do backup externo ficam no dispositivo.
+- Leituras, pontos de leitura, notas, favoritas, fila, datas de leitura e listas pessoais são sincronizados. A página selecionada e a data do backup externo ficam no dispositivo.
 - Apenas os campos alterados são enviados. Mudanças em itens diferentes são combinadas. Quando dois dispositivos alteram o mesmo campo, prevalece a última alteração recebida pelo servidor.
 - Alterações sem conexão ficam em uma fila local e são reenviadas ao reconectar. Aguarde **Pilha sincronizada na conta** antes de mudar de dispositivo. Se o navegador não puder gravar a fila, o site avisa para salvar um backup.
 - As abas do mesmo navegador coordenam os envios com Web Locks. A sincronização exige um navegador moderno com suporte à API.
 - Adicionar a pilha local preserva as notas e os marcadores já existentes na conta. A cópia local original permanece disponível ao sair.
 - **Limpar minha estante**, enquanto conectado, limpa também os itens conhecidos na conta. A confirmação informa esse alcance. O backup JSON continua disponível como cópia adicional.
 - Senhas são processadas pelo Firebase Authentication; não são armazenadas na pilha nem no código do site.
+
+### Listas pessoais
+
+O campo `customOrders` fica em `/piles/UID/customOrders`, protegido pelas mesmas regras de proprietário. Cada entrada é uma lista serializada como JSON, com limite de 200 mil caracteres e identificador `personal-UUID`. Os itens têm identificadores estáveis; trocar o título ou a posição não desloca o progresso para outro volume. O catálogo padrão permanece nos arquivos estáticos e não pode ser sobrescrito por uma lista importada.
+
+Publique a versão atual de `database.rules.json` antes dos novos scripts. Ela permite o novo campo apenas dentro da pilha privada, mantendo os bloqueios para visitantes e outros usuários. As listas seguem a fila offline e o cache individual de cada conta. O backup completo inclui `customOrders`; arquivos antigos continuam válidos e resultam em uma pilha sem listas pessoais. O JSON de **Compartilhar lista** usa o esquema separado `minha-pilha-list`, sem progresso ou identificação da conta, e cria novos identificadores a cada importação.
 
 ## Validação ao alterar a configuração
 

@@ -4,7 +4,8 @@
     if (order.title.toLowerCase().includes('spider-man')) return { ...order, publisher: 'Marvel', family: 'Homem-Aranha' };
     return { ...order, publisher: 'DC', family: 'Batman' };
   };
-  const orders = [...(window.COMIC_ORDERS || []), ...(window.EXPANDED_ORDERS || [])].map(classify);
+  const builtInOrders = [...(window.COMIC_ORDERS || []), ...(window.EXPANDED_ORDERS || [])].map(classify);
+  let orders = builtInOrders;
   let KEY = 'minha-pilha-v1';
   let AUTO_BACKUP_KEY = 'minha-pilha-v1-auto-backup';
   let accountId = null;
@@ -17,6 +18,7 @@
   let navQuery = '';
   const normalize = value => String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const state = load();
+  refreshOrders();
   let selected = orders.some(order => order.id === state.lastSelectedOrder) ? state.lastSelectedOrder : orders[0]?.id;
   let filter = 'all';
   let era = 'all';
@@ -28,6 +30,10 @@
   const $ = selector => document.querySelector(selector);
   const escapeHtml = value => String(value).replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
   const keyFor = (orderId, sectionIndex, itemIndex, childIndex = null) => `${orderId}:${sectionIndex}:${itemIndex}${childIndex === null ? '' : ':c' + childIndex}`;
+
+  function refreshOrders() {
+    orders = [...builtInOrders, ...Object.entries(state.customOrders).map(([id, value]) => window.PilhaPersonal.toOrder(window.PilhaPersonal.parse(value, id)))];
+  }
 
   function validateProgress(raw) {
     const plain = value => value && typeof value === 'object' && !Array.isArray(value);
@@ -43,6 +49,7 @@
     }
     if (raw.lastSelectedOrder != null && typeof raw.lastSelectedOrder !== 'string') throw new Error('Ordem inválida');
     for (const field of ['savedAt', 'lastBackupAt']) if (raw[field] != null && !isValidDate(raw[field])) throw new Error('Data inválida');
+    if (raw.customOrders !== undefined) window.PilhaPersonal.validateMap(raw.customOrders);
     return blankState(raw);
   }
   function blankState(raw = {}) {
@@ -53,6 +60,7 @@
       favoriteOrders: raw.favoriteOrders && typeof raw.favoriteOrders === 'object' ? raw.favoriteOrders : {},
       queueOrders: raw.queueOrders && typeof raw.queueOrders === 'object' ? raw.queueOrders : {},
       completedAt: raw.completedAt && typeof raw.completedAt === 'object' ? raw.completedAt : {},
+      customOrders: raw.customOrders || {},
       lastSelectedOrder: typeof raw.lastSelectedOrder === 'string' ? raw.lastSelectedOrder : null,
       savedAt: raw.savedAt || null,
       lastBackupAt: raw.lastBackupAt || null
@@ -113,7 +121,7 @@
     let read = 0;
     order.sections.forEach((section, sectionIndex) => section.items.forEach((item, itemIndex) => {
       const sectionKey = section.key ?? sectionIndex;
-      const keys = [keyFor(order.id, sectionKey, itemIndex), ...(item.companions || []).map((_, companionIndex) => keyFor(order.id, sectionKey, itemIndex, companionIndex))];
+      const keys = [keyFor(order.id, sectionKey, order.personal ? item.key : itemIndex), ...(item.companions || []).map((_, companionIndex) => keyFor(order.id, sectionKey, order.personal ? item.key : itemIndex, companionIndex))];
       keys.forEach(key => { total++; if (state.read[key]) read++; });
     }));
     return { total, read, pct: total ? Math.round(read / total * 100) : 0 };
@@ -124,8 +132,8 @@
     order.sections.forEach((section, sectionIndex) => section.items.forEach((item, itemIndex) => {
       const sectionKey = section.key ?? sectionIndex;
       const companions = item.companions || [];
-      entries.push({ key: keyFor(order.id, sectionKey, itemIndex), title: item.title, hasCompanions: companions.length > 0 });
-      companions.forEach((companion, companionIndex) => entries.push({ key: keyFor(order.id, sectionKey, itemIndex, companionIndex), title: companion.title, isCompanion: true }));
+      entries.push({ key: keyFor(order.id, sectionKey, order.personal ? item.key : itemIndex), title: item.title, hasCompanions: companions.length > 0 });
+      companions.forEach((companion, companionIndex) => entries.push({ key: keyFor(order.id, sectionKey, order.personal ? item.key : itemIndex, companionIndex), title: companion.title, isCompanion: true }));
     }));
     return entries;
   }
@@ -139,7 +147,7 @@
       for (let itemIndex = 0; itemIndex < order.sections[sectionIndex].items.length; itemIndex++) {
         const item = order.sections[sectionIndex].items[itemIndex];
         const sectionKey = order.sections[sectionIndex].key ?? sectionIndex;
-        const itemKey = keyFor(order.id, sectionKey, itemIndex);
+        const itemKey = keyFor(order.id, sectionKey, order.personal ? item.key : itemIndex);
         if (currentKey === itemKey) return item.title;
         if (currentKey.startsWith(itemKey + ':c')) return item.companions?.[Number(currentKey.split(':c')[1])]?.title || item.title;
       }
@@ -257,7 +265,7 @@
   function renderNav() {
     const visibleOrders = orders.filter(order => normalize([order.title, order.family, order.publisher].join(' ')).includes(navQuery));
     $('#navEmpty').hidden = visibleOrders.length > 0;
-    const preferredPublishers = ['DC', 'Marvel', 'Dark Horse'];
+    const preferredPublishers = ['Minhas listas', 'DC', 'Marvel', 'Dark Horse'];
     const publishers = [...preferredPublishers.filter(publisher => visibleOrders.some(order => order.publisher === publisher)), ...[...new Set(visibleOrders.map(order => order.publisher))].filter(publisher => !preferredPublishers.includes(publisher))];
     $('#orderNav').innerHTML = publishers.map(publisher => {
       const families = [...new Set(visibleOrders.filter(order => order.publisher === publisher).map(order => order.family))];
@@ -266,7 +274,7 @@
         return `<details class="family-group" ${navQuery || list.some(order => order.id === selected) ? 'open' : ''}><summary>${escapeHtml(family)}<span>${list.length}</span></summary><div>${list.map(order => {
           const progress = counts(order);
           const flags = `${state.favoriteOrders[order.id] ? '★' : ''}${state.queueOrders[order.id] ? '＋' : ''}`;
-          return `<button class="nav-button ${order.id === selected ? 'active' : ''}" data-id="${escapeHtml(order.id)}"><span>${escapeHtml(shortTitle(order.title))}${flags ? `<i class="nav-flags">${flags}</i>` : ''}</span><small>${progress.read}/${progress.total} · ${progress.pct}%</small></button>`;
+          return `<button class="nav-button ${order.id === selected ? 'active' : ''}" data-id="${escapeHtml(order.id)}"><span>${escapeHtml(order.personal ? order.title : shortTitle(order.title))}${flags ? `<i class="nav-flags">${flags}</i>` : ''}</span><small>${progress.read}/${progress.total} · ${progress.pct}%</small></button>`;
         }).join('')}</div></details>`;
       }).join('')}</section>`;
     }).join('');
@@ -312,7 +320,8 @@
     applyOrderTheme(order);
     const progress = counts(order);
     const batmanModern = order.id === 'batman-reading-order-the-modern-age-post-crisis';
-    $('#libraryTitle').textContent = batmanModern ? 'Batman' : shortTitle(order.title);
+    $('#libraryTitle').textContent = order.personal ? order.title : batmanModern ? 'Batman' : shortTitle(order.title);
+    window.PilhaPersonalUI?.selected(order.personal ? order.id : null);
     $('#orderSubtitle').textContent = order.description || (batmanModern ? 'A Era Moderna · Pós-Crise' : `${order.publisher} · ${order.family}`);
     $('#publisherBadge').textContent = order.publisher;
     $('#orderPhaseCount').textContent = `${order.sections.length} FASES`;
@@ -340,10 +349,10 @@
       if (era !== 'all' && String(section.key ?? sectionIndex) !== era) return '';
       const rows = section.items.map((item, itemIndex) => {
         const sectionKey = section.key ?? sectionIndex;
-        const mainKey = keyFor(order.id, sectionKey, itemIndex);
+        const mainKey = keyFor(order.id, sectionKey, order.personal ? item.key : itemIndex);
         const allText = [item.title, item.details, ...(item.companions || []).flatMap(companion => [companion.title, companion.details])].join(' ');
         if (!normalize(allText).includes(query)) return '';
-        const groupKeys = [mainKey, ...(item.companions || []).map((_, companionIndex) => keyFor(order.id, sectionKey, itemIndex, companionIndex))];
+        const groupKeys = [mainKey, ...(item.companions || []).map((_, companionIndex) => keyFor(order.id, sectionKey, order.personal ? item.key : itemIndex, companionIndex))];
         const groupRead = groupKeys.filter(key => state.read[key]).length;
         const groupComplete = groupRead === groupKeys.length;
         const groupProgress = Math.round(groupRead / groupKeys.length * 100);
@@ -359,7 +368,7 @@
           return `<div class="comic-row ${companion ? 'companion-row' : ''} ${read ? 'is-read' : ''} ${current ? 'is-current' : ''}" data-key="${escapeHtml(key)}"><input class="check" type="checkbox" ${read ? 'checked' : ''} aria-label="Marcar ${escapeHtml(entry.title)} como lido"><span class="comic-copy"><strong class="comic-title">${escapeHtml(entry.title)}</strong>${entry.details ? `<span class="comic-details">${escapeHtml(entry.details)}</span>` : ''}<span class="reading-metadata">${read && date ? `<span class="read-date">✓ Lido em ${formatDate(date)}</span>` : ''}${note ? '<span class="note-saved">● Nota salva</span>' : ''}</span></span><span class="row-actions">${arcAction}<button class="note-btn ${note ? 'has-note' : ''}" type="button">${note ? '✎ Nota' : '＋ Nota'}</button><button class="current-btn" type="button" title="${current ? 'Onde parei' : 'Marcar onde parei'}" aria-label="${current ? 'Onde parei' : 'Marcar onde parei'}: ${escapeHtml(entry.title)}">${current ? '★ Onde parei' : '☆ Marcar onde parei'}</button></span></div>`;
         };
         const main = makeRow(item, mainKey, false, groupAction);
-        const companions = (item.companions || []).map((companion, companionIndex) => makeRow(companion, keyFor(order.id, sectionKey, itemIndex, companionIndex), true)).join('');
+        const companions = (item.companions || []).map((companion, companionIndex) => makeRow(companion, keyFor(order.id, sectionKey, order.personal ? item.key : itemIndex, companionIndex), true)).join('');
         if (!main && !companions) return '';
         return `<article data-parent-key="${escapeHtml(mainKey)}" data-keys="${escapeHtml(groupKeys.join('|'))}" class="reading-group ${groupComplete ? 'group-complete' : groupRead ? 'group-partial' : ''}" style="--group-progress:${groupProgress}%">${main}${companions ? `<details class="group-details" data-detail="${escapeHtml(mainKey)}" ${expandAll || query || filter !== 'all' || expandedGroups.has(mainKey) ? 'open' : ''}><summary>${(item.companions || []).length} ${(item.companions || []).length === 1 ? 'item associado' : 'itens associados'} <span>Ver detalhes</span></summary><div class="companions">${companions}</div></details>` : ''}</article>`;
       }).join('');
@@ -480,7 +489,7 @@
     state.lastBackupAt = exportedAt;
     ensureCompletionDates(state, exportedAt);
     save();
-    const payload = JSON.stringify({ version: 3, schema: 'minha-pilha-progress', exportedAt, app: 'Minha Pilha', progress: blankState(state) }, null, 2);
+    const payload = JSON.stringify({ version: 4, schema: 'minha-pilha-progress', exportedAt, app: 'Minha Pilha', progress: blankState(state) }, null, 2);
     const blob = new Blob([payload], { type: 'application/json' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -522,15 +531,19 @@
   $('#importInput').onchange = async event => {
     const file = event.target.files?.[0];
     if (!file) return;
+    const importingAccount = accountId;
     try {
       const data = JSON.parse(await file.text());
+      if (accountId !== importingAccount) throw new Error('Conta alterada durante a importação');
       if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Backup inválido');
       if (data.schema && data.schema !== 'minha-pilha-progress') throw new Error('Backup de outro app');
       const imported = validateProgress(data.progress || data);
       ensureCompletionDates(imported, data.exportedAt || imported.savedAt || new Date().toISOString());
       Object.keys(state).forEach(key => delete state[key]);
       Object.assign(state, imported);
-      selected = orders.some(order => order.id === state.lastSelectedOrder) ? state.lastSelectedOrder : selected;
+      window.PilhaPersonalUI?.close();
+      refreshOrders();
+      selected = orders.some(order => order.id === state.lastSelectedOrder) ? state.lastSelectedOrder : orders[0]?.id;
       query = ''; era = 'all'; filter = 'all'; $('#searchInput').value = '';
       save(); render(); toast('Backup restaurado');
     } catch { toast('Arquivo de backup inválido'); }
@@ -538,9 +551,11 @@
   };
   $('#resetBtn').onclick = () => {
     const scope = accountId ? 'na sua conta e nos dispositivos sincronizados' : 'neste navegador';
-    if (!confirm(`Apagar leituras, notas, favoritos e toda a sua estante ${scope}?`)) return;
+    if (!confirm(`Apagar leituras, notas, favoritos, listas pessoais e toda a sua estante ${scope}?`)) return;
     Object.keys(state).forEach(key => delete state[key]);
     Object.assign(state, blankState());
+    window.PilhaPersonalUI?.close();
+    refreshOrders(); selected = orders[0]?.id;
     save(); render(); toast('Sua estante foi limpa');
   };
   window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); deferredInstallPrompt = event; $('#installBtn').hidden = false; });
@@ -589,7 +604,7 @@
   };
   $('#clearFiltersBtn').onclick = () => { filter = 'all'; query = ''; era = 'all'; $('#searchInput').value = ''; renderOrder(); };
   document.addEventListener('keydown', event => {
-    if (event.key === '/' && !event.ctrlKey && !event.metaKey && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName) && !$('#noteDialog').open) {
+    if (event.key === '/' && !event.ctrlKey && !event.metaKey && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName) && !document.querySelector('dialog[open]')) {
       event.preventDefault(); showView('library', false); $('#searchInput').focus();
     }
   });
@@ -597,6 +612,35 @@
     getProgress: () => JSON.parse(JSON.stringify(state)),
     validate: validateProgress,
     empty: blankState,
+    personal: {
+      get: id => state.customOrders[id] || null,
+      selectedId: () => window.PilhaPersonal.isId(selected) ? selected : null,
+      account: () => accountId,
+      save(list, base = null) {
+        const value = window.PilhaPersonal.serialize(list);
+        const existing = state.customOrders[list.id] || null;
+        if (existing !== base) throw Error('Esta lista mudou em outro dispositivo. Feche e abra a edição novamente para ver a versão atual.');
+        if (!existing && Object.keys(state.customOrders).length >= window.PilhaPersonal.MAX_LISTS) throw Error('Você atingiu o limite de 100 listas pessoais.');
+        const next = window.PilhaPersonal.parse(value);
+        if (existing) {
+          const keep = new Set(next.items.map(item => keyFor(list.id, 'personal', item.id)));
+          for (const field of ['read', 'notes', 'completedAt']) for (const key of Object.keys(state[field])) {
+            if (key.startsWith(`${list.id}:`) && !keep.has(key)) delete state[field][key];
+          }
+          if (state.current[list.id] && !keep.has(state.current[list.id])) delete state.current[list.id];
+        }
+        state.customOrders[list.id] = value;
+        refreshOrders(); selectOrder(list.id);
+      },
+      remove(id, base) {
+        if (!window.PilhaPersonal.isId(id) || !state.customOrders[id]) throw Error('Lista pessoal não encontrada.');
+        if (state.customOrders[id] !== base) throw Error('A lista mudou. Abra a versão atual antes de excluir.');
+        delete state.customOrders[id];
+        for (const field of ['current', 'favoriteOrders', 'queueOrders']) delete state[field][id];
+        for (const field of ['read', 'notes', 'completedAt']) for (const key of Object.keys(state[field])) if (key.startsWith(`${id}:`)) delete state[field][key];
+        refreshOrders(); selectOrder(orders[0].id);
+      }
+    },
     guestProgress() {
       if (accountId === null) return this.getProgress();
       if (accountMemory.has(null)) return JSON.parse(JSON.stringify(accountMemory.get(null)));
@@ -613,8 +657,10 @@
       KEY = uid ? `minha-pilha-account:${uid}` : 'minha-pilha-v1';
       AUTO_BACKUP_KEY = `${KEY}-auto-backup`;
       if ($('#noteDialog').open) $('#noteDialog').close();
+      window.PilhaPersonalUI?.close();
       Object.keys(state).forEach(key => delete state[key]);
       Object.assign(state, accountMemory.has(accountId) ? JSON.parse(JSON.stringify(accountMemory.get(accountId))) : load());
+      refreshOrders();
       selected = orders.some(order => order.id === state.lastSelectedOrder) ? state.lastSelectedOrder : orders[0]?.id;
       query = ''; era = 'all'; filter = 'all'; $('#searchInput').value = '';
       render();
@@ -623,7 +669,9 @@
     applyCloud(progress) {
       const incoming = validateProgress(progress);
       // Selection and external-backup dates belong to this device.
-      for (const field of ['read', 'current', 'notes', 'favoriteOrders', 'queueOrders', 'completedAt']) state[field] = incoming[field];
+      for (const field of ['read', 'current', 'notes', 'favoriteOrders', 'queueOrders', 'completedAt', 'customOrders']) state[field] = incoming[field];
+      refreshOrders();
+      if (!orders.some(order => order.id === selected)) selected = orders[0]?.id;
       applyingRemote = true;
       try { save(); render(); } finally { applyingRemote = false; }
     },

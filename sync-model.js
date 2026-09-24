@@ -1,5 +1,5 @@
 (function (root) {
-  const fields = ['read', 'current', 'notes', 'favoriteOrders', 'queueOrders', 'completedAt'];
+  const fields = ['read', 'current', 'notes', 'favoriteOrders', 'queueOrders', 'completedAt', 'customOrders'];
   const unsafe = key => ['__proto__', 'prototype', 'constructor'].includes(key);
   // Hex-encoded UTF-8 avoids all forbidden Realtime Database path characters.
   const encode = key => Array.from(new TextEncoder().encode(key), byte => byte.toString(16).padStart(2, '0')).join('');

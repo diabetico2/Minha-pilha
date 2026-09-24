@@ -172,7 +172,9 @@
   $('#importGuestBtn').onclick = () => {
     const s = session;
     if (!s?.ready) { message('Aguarde sua pilha da conta carregar antes de adicionar a pilha local.'); return; }
-    const merged = model.importGuest(app.getProgress(), app.guestProgress());
+    let merged;
+    try { merged = app.validate(model.importGuest(app.getProgress(), app.guestProgress())); }
+    catch (error) { message(error.message || 'Não foi possível combinar as pilhas. Exporte suas listas para guardá-las.'); return; }
     changed(merged); app.applyCloud(merged); observed = app.getProgress();
     $('#guestImportPanel').hidden = true;
     message('Pilha local adicionada à conta. A cópia original deste navegador foi preservada.');

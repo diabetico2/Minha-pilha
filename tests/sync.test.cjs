@@ -3,6 +3,8 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const model = require('../sync-model.js');
+const personal = require('../personal-library.js');
+const makeList = () => ({ id: `personal-${require('node:crypto').randomUUID()}`, title: 'Mangá pessoal', kind: 'manga', description: '', items: [{ id: `item-${require('node:crypto').randomUUID()}`, title: 'Volume 1', details: '' }] });
 const clone = value => JSON.parse(JSON.stringify(value));
 const empty = () => Object.fromEntries(model.fields.map(field => [field, {}]));
 let passed = 0;
@@ -32,7 +34,7 @@ async function client(server, storage = new Map()) {
     return elements.get(id);
   };
   const source = fs.readFileSync(path.join(__dirname,'../app.js'), 'utf8');
-  const validators = {};
+  const validators = { window: { PilhaPersonal: personal } };
   vm.createContext(validators);
   vm.runInContext(source.slice(source.indexOf('  function validateProgress('), source.indexOf('  function ensureCompletionDates(')), validators);
   const app = {
@@ -86,8 +88,8 @@ async function client(server, storage = new Map()) {
   await test('production app bridge preserves guest memory and switches account caches',()=>{
     const source=fs.readFileSync(path.join(__dirname,'../app.js'),'utf8');
     const initial=empty();initial.read.guest=true;
-    const bridgeContext={window:{},state:initial,accountId:null,accountMemory:new Map(),orders:[{id:'batman'}],selected:'batman',KEY:'minha-pilha-v1',AUTO_BACKUP_KEY:'minha-pilha-v1-auto-backup',applyingRemote:false,
-      $:()=>({open:false,value:''}),load:()=>empty(),render(){},save(){},toast(){},localStorage:{getItem:()=>null}};
+    const bridgeContext={window:{PilhaPersonal:personal},state:initial,accountId:null,accountMemory:new Map(),orders:[{id:'batman'}],selected:'batman',KEY:'minha-pilha-v1',AUTO_BACKUP_KEY:'minha-pilha-v1-auto-backup',applyingRemote:false,
+      $:()=>({open:false,value:''}),load:()=>empty(),refreshOrders(){},render(){},save(){},toast(){},localStorage:{getItem:()=>null}};
     vm.createContext(bridgeContext);
     vm.runInContext(source.slice(source.indexOf('  function validateProgress('), source.indexOf('  function ensureCompletionDates(')),bridgeContext);
     const start=source.indexOf('  window.PilhaApp =');
@@ -95,7 +97,7 @@ async function client(server, storage = new Map()) {
     const bridge=bridgeContext.window.PilhaApp;
     bridge.setAccount(null);assert.equal(bridge.getProgress().read.guest,true);
     bridge.setAccount('alice');assert.deepEqual(clone(bridge.getProgress().read),{});assert.equal(bridge.guestProgress().read.guest,true);
-    const personal=empty();personal.read.alice=true;bridge.applyCloud(personal);
+    const accountPile=empty();accountPile.read.alice=true;bridge.applyCloud(accountPile);
     bridge.setAccount('bob');assert.deepEqual(clone(bridge.getProgress().read),{});
     bridge.setAccount('alice');assert.equal(bridge.getProgress().read.alice,true);
     bridge.setAccount(null);assert.deepEqual(clone(bridge.getProgress().read),{guest:true});
@@ -146,6 +148,32 @@ async function client(server, storage = new Map()) {
     const server=fakeServer(),a=await client(server);a.login('alice');a.edit('read','valid',true);await a.flush();
     server.data.set('alice',{notes:{[model.encode('bad')]:123}});server.publish('alice');
     assert.equal(a.app.getProgress().read.valid,true);assert.match(a.elements.get('#accountSyncDetail').textContent,/cópia local foi mantida/);
+  });
+  await test('personal lists sync only to their owner, preserve independent lists and delete remotely',async()=>{
+    const server=fakeServer(),a=await client(server),b=await client(server),other=await client(server);
+    a.login('alice');b.login('alice');other.login('bob');
+    const first=makeList(),second=makeList();
+    a.edit('customOrders',first.id,personal.serialize(first));b.edit('customOrders',second.id,personal.serialize(second));
+    await a.flush();await b.flush();
+    assert.equal(Object.keys(b.app.getProgress().customOrders).length,2);
+    assert.deepEqual(other.app.getProgress().customOrders,{});
+    first.title='Título editado';a.edit('customOrders',first.id,personal.serialize(first));await a.flush();
+    assert.equal(personal.parse(b.app.getProgress().customOrders[first.id]).title,'Título editado');
+    a.edit('customOrders',first.id,null);await a.flush();assert.equal(b.app.getProgress().customOrders[first.id],undefined);
+    assert.ok(b.app.getProgress().customOrders[second.id]);
+  });
+  await test('personal list survives offline reload and guest migration is explicit',async()=>{
+    const server=fakeServer(),storage=new Map(),a=await client(server,storage),list=makeList(),guest=empty();
+    guest.customOrders[list.id]=personal.serialize(list);a.setGuest(guest);a.login('alice');
+    assert.deepEqual(a.app.getProgress().customOrders,{});a.connect(false);a.import();await a.flush();
+    assert.equal(server.writes.length,0);a.close();
+    const b=await client(server,storage);b.login('alice');await b.flush();
+    assert.equal(b.app.getProgress().customOrders[list.id],guest.customOrders[list.id]);
+  });
+  await test('malformed custom catalogue cannot replace the visible account state',async()=>{
+    const server=fakeServer(),a=await client(server);a.login('alice');a.edit('read','safe',true);await a.flush();
+    const list=makeList();server.data.set('alice',{customOrders:{[model.encode(list.id)]:'{"id":"batman"}'}});server.publish('alice');
+    assert.equal(a.app.getProgress().read.safe,true);assert.deepEqual(a.app.getProgress().customOrders,{});
   });
   console.log(`${passed} sync tests passed`);
 })().catch(error=>{console.error(error);process.exitCode=1;});
