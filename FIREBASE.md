@@ -2,6 +2,8 @@
 
 O site continua no GitHub Pages. O Firebase fornece Authentication (e-mail e senha) e Realtime Database, no plano **Spark**, sem cartão. Não é necessário Firestore, Storage, Functions, Analytics nem plano Blaze.
 
+O projeto ativo é `minha-pilha-diabetico2`, com Realtime Database em `us-central1`. O domínio `diabetico2.github.io` está autorizado e as regras de `database.rules.json` foram publicadas. O plano foi confirmado no console como **Spark — US$ 0/mês**, sem vincular faturamento. Ao atingir a cota gratuita, o serviço pode ficar indisponível até a renovação; mantenha o projeto no Spark para evitar cobranças por excedentes.
+
 ## Configuração inicial
 
 1. Entre em https://console.firebase.google.com/ com a conta Google que será proprietária do projeto.
@@ -27,6 +29,12 @@ Esses identificadores do aplicativo Web são públicos. Nunca coloque senha, cha
 8. Publique os arquivos do site. Crie a sua conta pelo botão **Entrar → Criar conta**.
 9. No navegador onde está sua pilha antiga, entre na conta e use **Adicionar pilha deste navegador**. Essa etapa transfere as marcações sem arquivo JSON. Em outros dispositivos, basta entrar com a mesma conta.
 
+## Importar um save antigo em JSON
+
+Entre na conta desejada, aguarde a pilha carregar e use **Restaurar** para selecionar o JSON antigo. A restauração substitui o progresso dessa conta pelo conteúdo do arquivo e sincroniza com o banco. Aguarde **Pilha sincronizada na conta** antes de abrir outro dispositivo. **Salvar backup** continua exportando a pilha em JSON, com ou sem login.
+
+Se a conta já tem leituras que você quer preservar, salve um backup dela antes de restaurar. Para combinar a pilha local com a conta, prefira **Adicionar pilha deste navegador**, que mantém as notas e os marcadores já existentes na conta.
+
 ## Como os dados são preservados
 
 - A pilha sem login mantém a chave local original `minha-pilha-v1`.
@@ -39,7 +47,7 @@ Esses identificadores do aplicativo Web são públicos. Nunca coloque senha, cha
 - **Limpar minha estante**, enquanto conectado, limpa também os itens conhecidos na conta. A confirmação informa esse alcance. O backup JSON continua disponível como cópia adicional.
 - Senhas são processadas pelo Firebase Authentication; não são armazenadas na pilha nem no código do site.
 
-## Validação antes de ativar
+## Validação ao alterar a configuração
 
 Teste com duas contas: cada uma deve ver apenas sua pilha. Teste marcar um item em dois dispositivos, remover uma marcação, sair/entrar e reconectar após uma alteração offline. Uma requisição sem login ou com outro UID deve ser negada pelas regras publicadas.
 

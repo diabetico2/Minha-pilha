@@ -36,11 +36,11 @@ Os backups anteriores continuam compatíveis. Quando a versão é atualizada no 
 
 ## Conta e sincronização
 
-A integração com Firebase está preparada, mas precisa de um projeto configurado para funcionar. Consulte [FIREBASE.md](FIREBASE.md) para ativar Authentication e Realtime Database no plano gratuito e publicar as regras que isolam cada usuário.
+A sincronização usa Firebase Authentication e Realtime Database no projeto `minha-pilha-diabetico2`, configurado no plano **Spark, sem custo e sem cartão**. As regras publicadas permitem que cada conta leia e altere somente a própria pilha. Consulte [FIREBASE.md](FIREBASE.md) para detalhes de configuração e manutenção.
 
-Depois de ativada, use **Entrar** para criar sua conta ou entrar com e-mail e senha. No dispositivo com a pilha antiga, use **Adicionar pilha deste navegador** uma vez. Depois, use a mesma conta nos demais dispositivos. O JSON continua disponível como backup opcional.
+Use **Entrar → Criar conta** para cadastrar e-mail e senha. No dispositivo com a pilha antiga, use **Adicionar pilha deste navegador** uma vez. Depois, use a mesma conta nos demais dispositivos. Para importar um save em JSON, entre na conta, aguarde o carregamento e use **Restaurar**. A restauração substitui o progresso da conta pelo arquivo; aguarde **Pilha sincronizada na conta** antes de mudar de dispositivo. **Salvar backup** continua exportando JSON, com ou sem login.
 
-Testes da lógica de sincronização: `node tests/sync.test.cjs`. Esses testes usam um serviço simulado; a conexão e as regras precisam ser verificadas no projeto Firebase antes da ativação pública.
+Testes da lógica de sincronização: `node tests/sync.test.cjs`. Além dos testes locais, foram verificados no Firebase real: cadastro e login, recebimento em outro cliente, combinação de alterações, remoção de marcações, isolamento entre contas, bloqueio de acesso sem login e validação dos dados. A importação de JSON pela interface também foi conferida no banco. Os testes reais usam contas temporárias, sem alterar pilhas pessoais.
 
 ## Leitura e notas
 
