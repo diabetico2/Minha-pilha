@@ -1,12 +1,12 @@
-const CACHE_NAME = 'minha-pilha-v11';
+const CACHE_NAME = 'minha-pilha-v12';
 const CORE_FILES = [
   './',
   './index.html',
   './styles.css',
-  './cloud-sync.css',
-  './firebase-config.js',
-  './sync-model.js',
-  './cloud-sync.js',
+  './cloud-sync.css?v=12',
+  './firebase-config.js?v=12',
+  './sync-model.js?v=12',
+  './cloud-sync.js?v=12',
   './vendor/firebase.js',
   './app-icon.svg',
   './manifest.webmanifest',
@@ -19,7 +19,7 @@ const CORE_FILES = [
   './library-wave-5.js',
   './library-wave-6.js',
   './character-themes.js',
-  './app.js'
+  './app.js?v=12'
 ];
 
 self.addEventListener('install', event => {
