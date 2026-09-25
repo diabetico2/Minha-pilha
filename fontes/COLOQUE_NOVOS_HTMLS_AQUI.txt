@@ -1,5 +1,0 @@
-Salve novos HTMLs do Comic Book Treasury nesta pasta e execute:
-
-python ferramentas/importar_html.py
-
-Para preservar também as ordens atuais ao reconstruir data.js, mantenha nesta pasta os HTMLs de todas as ordens desejadas.

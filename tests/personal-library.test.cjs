@@ -2,8 +2,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const { randomUUID } = require('node:crypto');
-const model = require('../personal-library.js');
-const source = fs.readFileSync(require('node:path').join(__dirname, '../app.js'), 'utf8');
+const model = require('../assets/js/personal-library.js');
+const source = fs.readFileSync(require('node:path').join(__dirname, '../assets/js/app.js'), 'utf8');
 const clone = value => JSON.parse(JSON.stringify(value));
 const makeId = prefix => `${prefix}-${randomUUID()}`;
 const fixture = () => ({ id: makeId('personal'), title: 'Berserk (minha ordem)', kind: 'manga', description: 'Minha seleção', items: [1,2,3].map(n => ({ id: makeId('item'), title: `Volume ${n}`, details: '' })) });
@@ -11,7 +11,7 @@ let passed = 0;
 function test(name, run) { run(); passed++; console.log(`PASS ${name}`); }
 function bridge() {
   const builtInOrders=[{id:'batman', title:'Batman', sections:[{key:4, title:'Fase', items:[{title:'Batman #1'}]}]}];
-  const c={window:{PilhaPersonal:model,PilhaProfileModel:require('../profile-model.js')}, builtInOrders, orders:builtInOrders, accountId:null,accountMemory:new Map(),selected:'batman',applyingRemote:false,
+  const c={window:{PilhaPersonal:model,PilhaProfileModel:require('../assets/js/profile-model.js')}, builtInOrders, orders:builtInOrders, accountId:null,accountMemory:new Map(),selected:'batman',applyingRemote:false,
     $:()=>({open:false,value:''}),load:()=>c.blankState(),showView(){},render(){},save(){},toast(){},localStorage:{getItem:()=>null},
     keyFor:(order,section,item)=>`${order}:${section}:${item}`,selectOrder:id=>{c.selected=id}};
   vm.createContext(c);

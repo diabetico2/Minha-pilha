@@ -2,9 +2,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
-const model = require('../sync-model.js');
-const personal = require('../personal-library.js');
-const profileModel = require('../profile-model.js');
+const model = require('../assets/js/sync-model.js');
+const personal = require('../assets/js/personal-library.js');
+const profileModel = require('../assets/js/profile-model.js');
 const makeList = () => ({ id: `personal-${require('node:crypto').randomUUID()}`, title: 'Mangá pessoal', kind: 'manga', description: '', items: [{ id: `item-${require('node:crypto').randomUUID()}`, title: 'Volume 1', details: '' }] });
 const clone = value => JSON.parse(JSON.stringify(value));
 const empty = () => Object.fromEntries(model.fields.map(field => [field, {}]));
@@ -34,7 +34,7 @@ async function client(server, storage = new Map(), passwordAPI = {}) {
     if (!elements.has(id)) elements.set(id, { textContent:'', value:'', hidden:false, disabled:false, prepend(){}, append(){}, setAttribute(){}, reportValidity:()=>true, querySelectorAll:()=>[], showModal(){}, close(){} });
     return elements.get(id);
   };
-  const source = fs.readFileSync(path.join(__dirname,'../app.js'), 'utf8');
+  const source = fs.readFileSync(path.join(__dirname,'../assets/js/app.js'), 'utf8');
   const validators = { window: { PilhaPersonal: personal, PilhaProfileModel: profileModel } };
   vm.createContext(validators);
   vm.runInContext(source.slice(source.indexOf('  function validateProgress('), source.indexOf('  function ensureCompletionDates(')), validators);
@@ -71,7 +71,7 @@ async function client(server, storage = new Map(), passwordAPI = {}) {
   };
   vm.createContext(context);
   // Inject only the SDK dependency; exercise the production controller unchanged.
-  const controller=fs.readFileSync(path.join(__dirname,'../cloud-sync.js'),'utf8').replace(/import\('\.\/vendor\/firebase\.js(?:\?v=\d+)?'\)/,'Promise.resolve(sdk)');
+  const controller=fs.readFileSync(path.join(__dirname,'../assets/js/cloud-sync.js'),'utf8').replace(/import\('\.\.\/vendor\/firebase\/firebase\.js(?:\?v=\d+)?'\)/,'Promise.resolve(sdk)');
   vm.runInContext(controller,context);await turn();
   return {
     app, elements, storage, handlers, cloud:context.window.PilhaCloud,
@@ -89,7 +89,7 @@ async function client(server, storage = new Map(), passwordAPI = {}) {
 }
 (async()=>{
   await test('production app bridge preserves guest memory and switches account caches',()=>{
-    const source=fs.readFileSync(path.join(__dirname,'../app.js'),'utf8');
+    const source=fs.readFileSync(path.join(__dirname,'../assets/js/app.js'),'utf8');
     const initial=empty();initial.read.guest=true;
     const bridgeContext={window:{PilhaPersonal:personal,PilhaProfileModel:profileModel},state:initial,accountId:null,accountMemory:new Map(),orders:[{id:'batman'}],selected:'batman',KEY:'minha-pilha-v1',AUTO_BACKUP_KEY:'minha-pilha-v1-auto-backup',applyingRemote:false,
       $:()=>({open:false,value:''}),load:()=>empty(),showView(){},selectOrder(){},refreshOrders(){},render(){},save(){},toast(){},localStorage:{getItem:()=>null}};
