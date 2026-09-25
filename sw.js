@@ -1,10 +1,10 @@
-const CACHE_NAME = 'minha-pilha-v17';
+const CACHE_NAME = 'minha-pilha-v18';
 const CORE_FILES = [
   './',
   './index.html',
   './manifest.webmanifest',
   './assets/images/app-icon.svg',
-  './assets/css/styles.css?v=17',
+  './assets/css/styles.css?v=18',
   './assets/css/cloud-sync.css?v=17',
   './assets/css/personal-library.css?v=17',
   './assets/css/home-profile.css?v=17',
