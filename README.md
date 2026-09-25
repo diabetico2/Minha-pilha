@@ -42,6 +42,8 @@ Para atualizar imagens, revise as referências do índice e execute `npm run cov
 
 O importador histórico é `tools/importar_html.py`. Ele lê `docs/fontes/` e reescreve `assets/data/data.js`; use somente ao revisar deliberadamente o catálogo. Não altere IDs ou a ordem dos itens existentes sem migrar o progresso.
 
+As descrições e orientações das 15 listas importadas são traduzidas para português por `assets/data/catalogue-pt-br.js`, carregado depois das expansões do catálogo. Os nomes das edições, encadernados e runs permanecem em inglês. A tradução usa correspondências exatas e não altera listas pessoais, IDs, numeração ou posições de leitura. Alguns textos explicativos vieram misturados ao campo de título na importação; apenas a prosa desses trechos foi traduzida. Revise os pares de texto nesse arquivo ao atualizar a fonte. Indicações antigas de disponibilidade ou lançamento continuam atribuídas à fonte original; esta tradução não atualiza o catálogo editorial.
+
 ## Contas e dados
 
 Firebase Authentication e Realtime Database usam o plano gratuito Spark. A configuração web em `config/firebase-config.js` é pública; senhas e chaves privadas não pertencem ao repositório. As regras em `firebase/database.rules.json` isolam cada conta.
