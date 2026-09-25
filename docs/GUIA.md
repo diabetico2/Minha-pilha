@@ -65,7 +65,7 @@ Testes: `node tests/personal-library.test.cjs` e `node tests/sync.test.cjs`. Ao 
 
 ## Perfil e imagens
 
-Entre na conta e clique no seu nome ou em **Meu perfil**. Escolha a foto, preencha o nome e a apresentação e clique em **Salvar perfil**. Fotos são recortadas para 192 × 192 e capas para 480 × 320, reduzidas no navegador e guardadas no Realtime Database. O arquivo de origem pode ter até 8 MB; o resultado tem limite de 32 mil caracteres para fotos e 100 mil para capas. Não é necessário ativar Firebase Storage ou um plano pago.
+Entre na conta e clique no seu nome ou em **Meu perfil**. Escolha a foto e ajuste o zoom e a posição dentro do recorte circular. Confirme o recorte, preencha o nome e a apresentação e clique em **Salvar perfil**. Fotos são reduzidas para 192 × 192 e capas para 480 × 320 no navegador antes de serem guardadas no Realtime Database. O arquivo de origem pode ter até 8 MB; o resultado tem limite de 32 mil caracteres para fotos e 100 mil para capas. Não é necessário ativar Firebase Storage ou um plano pago.
 
 As imagens do catálogo ficam em `assets/images/covers/`, servidas junto com o site e com crédito à fonte em cada cartão. Depois de visitadas, ficam disponíveis no cache offline. O catálogo e suas chaves de progresso não foram alterados.
 

@@ -1,9 +1,10 @@
 (() => {
   const app=window.PilhaApp, cloud=window.PilhaCloud, $=selector=>document.querySelector(selector);
-  let owner=null, draft={}, dirty=false, imageToken=0, imageBusy=false, passwordBusy=false;
+  let owner=null, draft={}, dirty=false, imageToken=0, imageBusy=false, passwordBusy=false, editorImage=null;
   const panel=document.createElement('section');panel.className='profile-panel';
   panel.innerHTML=`<div class="profile-heading"><div class="profile-avatar" id="profileAvatar"><span>MP</span></div><div><h3 id="profileDisplayName">Seu perfil</h3><p id="profileStats"></p></div></div>
     <form id="profileForm"><div class="profile-photo-actions"><button type="button" class="dialog-secondary" id="uploadAvatarBtn">Escolher foto</button><button type="button" class="text-button" id="removeAvatarBtn">Remover foto</button><input type="file" id="avatarInput" accept="image/jpeg,image/png,image/webp" hidden></div>
+    <section class="avatar-editor" id="avatarEditor" aria-labelledby="avatarEditorTitle" hidden><div class="avatar-crop-stage" id="avatarCropStage"><img id="avatarCropImage" alt="Prévia do recorte da foto"></div><div class="avatar-editor-controls"><h4 id="avatarEditorTitle">Ajustar foto</h4><p>Use o zoom e mova o enquadramento até a foto ficar como você quer.</p><label for="avatarZoom">Zoom<input id="avatarZoom" type="range" min="1" max="3" value="1" step="0.01"></label><label for="avatarPositionX">Posição horizontal<input id="avatarPositionX" type="range" min="-1" max="1" value="0" step="0.01"></label><label for="avatarPositionY">Posição vertical<input id="avatarPositionY" type="range" min="-1" max="1" value="0" step="0.01"></label><div class="avatar-editor-actions"><button class="dialog-primary" type="button" id="applyAvatarCropBtn">Usar este recorte</button><button class="dialog-secondary" type="button" id="cancelAvatarCropBtn">Cancelar</button></div></div></section>
     <label for="profileName">Como você quer ser chamado?</label><input id="profileName" maxlength="60" placeholder="Seu nome ou apelido" autocomplete="nickname">
     <label for="profileBio">Sobre sua leitura <small>opcional</small></label><textarea id="profileBio" maxlength="280" rows="2" placeholder="Suas histórias e personagens favoritos…"></textarea>
     <p class="profile-privacy">Seu perfil fica na sua conta. Fotos e nome não entram nos arquivos de listas compartilhadas.</p><div class="account-actions"><button class="dialog-primary" id="saveProfileBtn" type="submit">Salvar perfil</button></div><p id="profileMessage" role="status"></p></form>
@@ -14,6 +15,12 @@
     element.replaceChildren();
     if(profile.avatar){const img=document.createElement('img');img.src=profile.avatar;img.alt='';element.append(img);}
     else {const label=document.createElement('span');label.textContent=(profile.displayName||'Minha Pilha').trim().split(/\s+/).slice(0,2).map(word=>word[0]).join('').toUpperCase();element.append(label);}
+  }
+  function cropOptions(){return {zoom:$('#avatarZoom').value,x:$('#avatarPositionX').value,y:$('#avatarPositionY').value};}
+  function closeAvatarEditor(){editorImage=null;$('#avatarEditor').hidden=true;$('#avatarCropImage').removeAttribute('src');$('#saveProfileBtn').disabled=imageBusy;}
+  function updateAvatarPreview(){
+    if(!editorImage)return;const stage=$('#avatarCropStage'),size=stage.clientWidth||220,layout=window.PilhaMedia.avatarLayout(editorImage,cropOptions(),size),image=$('#avatarCropImage');
+    image.src=editorImage.src;Object.assign(image.style,{width:`${layout.width}px`,height:`${layout.height}px`,left:`${layout.left}px`,top:`${layout.top}px`});
   }
   function refresh() {
     const profile=app.getProfile(),user=cloud.user();
@@ -27,23 +34,26 @@
     else{$('#accountBtn').textContent='Entrar';$('#accountBtn').removeAttribute('aria-label');}
   }
   function open() {
-    owner=cloud.user()?.uid||null;draft=app.getProfile();dirty=false;imageBusy=false;imageToken++;
+    owner=cloud.user()?.uid||null;draft=app.getProfile();dirty=false;imageBusy=false;imageToken++;closeAvatarEditor();
     $('#profileName').value=draft.displayName||'';$('#profileBio').value=draft.bio||'';
     $('#profileMessage').textContent='';$('#passwordMessage').textContent='';
     $('#saveProfileBtn').disabled=false;refresh();
   }
   function clearPasswords() { for(const id of ['#currentPassword','#newPassword','#confirmPassword']) $(id).value=''; }
-  $('#profileForm').oninput=event=>{if(event.target.id==='profileName')draft.displayName=event.target.value;if(event.target.id==='profileBio')draft.bio=event.target.value;dirty=true;};
+  $('#profileForm').oninput=event=>{if(event.target.id==='profileName'){draft.displayName=event.target.value;dirty=true;}if(event.target.id==='profileBio'){draft.bio=event.target.value;dirty=true;}};
   $('#uploadAvatarBtn').onclick=()=>$('#avatarInput').click();
   $('#avatarInput').onchange=async event=>{
-    const file=event.target.files?.[0];if(!file)return;const token=++imageToken;imageBusy=true;$('#saveProfileBtn').disabled=true;$('#profileMessage').textContent='Preparando sua foto…';
-    try {const image=await window.PilhaMedia.readImage(file,'avatar');if(token!==imageToken)return;draft.avatar=image;dirty=true;refresh();$('#profileMessage').textContent='Foto pronta. Salve o perfil para aplicar.';}
+    const file=event.target.files?.[0];if(!file)return;const token=++imageToken;imageBusy=true;closeAvatarEditor();$('#saveProfileBtn').disabled=true;$('#profileMessage').textContent='Abrindo sua foto…';
+    try {const image=await window.PilhaMedia.loadImage(file);if(token!==imageToken)return;editorImage=image;for(const id of ['#avatarZoom','#avatarPositionX','#avatarPositionY'])$(id).value=id==='#avatarZoom'?'1':'0';$('#avatarEditor').hidden=false;updateAvatarPreview();$('#profileMessage').textContent='Ajuste o enquadramento e confirme o recorte.';}
     catch(error){if(token===imageToken)$('#profileMessage').textContent=error.message;}
-    finally{event.target.value='';if(token===imageToken){imageBusy=false;$('#saveProfileBtn').disabled=false;}}
+    finally{event.target.value='';if(token===imageToken){imageBusy=false;$('#saveProfileBtn').disabled=!!editorImage;}}
   };
-  $('#removeAvatarBtn').onclick=()=>{imageToken++;imageBusy=false;$('#saveProfileBtn').disabled=false;draft.avatar='';dirty=true;refresh();};
+  for(const id of ['#avatarZoom','#avatarPositionX','#avatarPositionY'])$(id).oninput=updateAvatarPreview;
+  $('#applyAvatarCropBtn').onclick=()=>{if(!editorImage)return;try{draft.avatar=window.PilhaMedia.avatarData(editorImage,cropOptions());dirty=true;closeAvatarEditor();refresh();$('#profileMessage').textContent='Foto pronta. Salve o perfil para aplicar.';}catch(error){$('#profileMessage').textContent=error.message;}};
+  $('#cancelAvatarCropBtn').onclick=()=>{imageToken++;imageBusy=false;closeAvatarEditor();$('#profileMessage').textContent='A foto anterior foi mantida.';};
+  $('#removeAvatarBtn').onclick=()=>{imageToken++;imageBusy=false;closeAvatarEditor();draft.avatar='';dirty=true;refresh();};
   $('#profileForm').onsubmit=event=>{
-    event.preventDefault();if(imageBusy)return;
+    event.preventDefault();if(imageBusy)return;if(editorImage){$('#profileMessage').textContent='Confirme ou cancele o recorte antes de salvar.';return;}
     try {if(!owner||cloud.user()?.uid!==owner)throw Error('A conta mudou. Abra o perfil novamente.');app.saveProfile({displayName:($('#profileName').value||'').trim(),bio:($('#profileBio').value||'').trim(),avatar:draft.avatar||''});dirty=false;refresh();$('#profileMessage').textContent='Perfil salvo. As alterações serão sincronizadas com sua conta.';}
     catch(error){$('#profileMessage').textContent=error.message;}
   };
@@ -55,7 +65,7 @@
     catch(error){if(cloud.user()?.uid===uid)$('#passwordMessage').textContent=error.message;}
     finally{clearPasswords();passwordBusy=false;$('#changePasswordBtn').disabled=false;}
   };
-  $('#accountDialog').addEventListener('close',()=>{clearPasswords();imageToken++;imageBusy=false;dirty=false;});
+  $('#accountDialog').addEventListener('close',()=>{clearPasswords();imageToken++;imageBusy=false;dirty=false;closeAvatarEditor();});
   window.PilhaProfileUI={refresh,open,userChanged(user){if(owner!==(user?.uid||null)){clearPasswords();open();}refresh();}};
   open();
 })();

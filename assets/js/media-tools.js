@@ -1,22 +1,51 @@
 (() => {
-  async function readImage(file, type) {
+  function validateFile(file) {
     if (!file || !['image/jpeg','image/png','image/webp'].includes(file.type)) throw Error('Escolha uma imagem JPG, PNG ou WebP.');
     if (file.size > 8 * 1024 * 1024) throw Error('Escolha uma imagem de até 8 MB.');
-    const url = URL.createObjectURL(file), image = new Image();
+  }
+  async function loadImage(file) {
+    validateFile(file);
+    const source = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(Error('Não foi possível abrir esta imagem. Tente outro arquivo.'));
+      reader.readAsDataURL(file);
+    });
+    const image = new Image();
     try {
-      image.src = url; await image.decode();
+      image.src = source; await image.decode();
       if (!image.naturalWidth || image.naturalWidth * image.naturalHeight > 40000000) throw Error('A imagem é muito grande. Escolha uma versão menor.');
-      const avatar = type === 'avatar', canvas = document.createElement('canvas');
-      canvas.width = avatar ? 192 : 480; canvas.height = avatar ? 192 : 320;
-      const context = canvas.getContext('2d');
-      context.fillStyle = '#171a21'; context.fillRect(0,0,canvas.width,canvas.height);
-      const scale = Math.max(canvas.width / image.naturalWidth,canvas.height / image.naturalHeight);
-      context.drawImage(image,(canvas.width-image.naturalWidth*scale)/2,(canvas.height-image.naturalHeight*scale)/2,image.naturalWidth*scale,image.naturalHeight*scale);
-      const limit = avatar ? 32000 : 100000;
-      for (const quality of [.86,.72,.58,.42,.28]) { const encoded = canvas.toDataURL('image/jpeg',quality); if (encoded.length <= limit) return encoded; }
-      throw Error('Não foi possível reduzir esta imagem. Tente uma imagem mais simples.');
+      return image;
     } catch (error) { throw Error(error.message.includes('imagem') ? error.message : 'Não foi possível abrir esta imagem. Tente outro arquivo.'); }
-    finally { URL.revokeObjectURL(url); }
+  }
+  const clamp = (value,min,max) => Math.min(max,Math.max(min,Number(value)||0));
+  function avatarLayout(image, options = {}, size = 192) {
+    const width=Number(image?.naturalWidth),height=Number(image?.naturalHeight);
+    if(!width||!height||width*height>40000000) throw Error('A imagem é muito grande. Escolha uma versão menor.');
+    const zoom=clamp(options.zoom ?? 1,1,3),x=clamp(options.x ?? 0,-1,1),y=clamp(options.y ?? 0,-1,1);
+    const scale=Math.max(size/width,size/height)*zoom,drawWidth=width*scale,drawHeight=height*scale;
+    const overflowX=Math.max(0,(drawWidth-size)/2),overflowY=Math.max(0,(drawHeight-size)/2);
+    return {width:drawWidth,height:drawHeight,left:(size-drawWidth)/2+x*overflowX,top:(size-drawHeight)/2+y*overflowY};
+  }
+  function encode(canvas,limit) {
+    for (const quality of [.86,.72,.58,.42,.28]) { const result=canvas.toDataURL('image/jpeg',quality); if(result.length<=limit)return result; }
+    throw Error('Não foi possível reduzir esta imagem. Tente uma imagem mais simples.');
+  }
+  function avatarData(image,options={}) {
+    const canvas=document.createElement('canvas');canvas.width=192;canvas.height=192;
+    const context=canvas.getContext('2d'),layout=avatarLayout(image,options,192);
+    context.fillStyle='#171a21';context.fillRect(0,0,192,192);
+    context.drawImage(image,layout.left,layout.top,layout.width,layout.height);
+    return encode(canvas,32000);
+  }
+  async function readImage(file, type) {
+    const image=await loadImage(file);
+    if(type==='avatar')return avatarData(image);
+    const canvas=document.createElement('canvas');canvas.width=480;canvas.height=320;
+    const context=canvas.getContext('2d');context.fillStyle='#171a21';context.fillRect(0,0,480,320);
+    const scale=Math.max(480/image.naturalWidth,320/image.naturalHeight);
+    context.drawImage(image,(480-image.naturalWidth*scale)/2,(320-image.naturalHeight*scale)/2,image.naturalWidth*scale,image.naturalHeight*scale);
+    return encode(canvas,100000);
   }
   function cover(title, color = '#d4b76c', style = 'orbit', kind = 'comic') {
     const canvas = document.createElement('canvas'); canvas.width=480; canvas.height=320;
@@ -32,5 +61,5 @@
     ctx.font='12px system-ui';ctx.fillStyle='#ced4de';ctx.fillText('Uma história de cada vez.                              mp.',32,291);
     return canvas.toDataURL('image/jpeg',.8);
   }
-  window.PilhaMedia = { readImage, cover };
+  window.PilhaMedia = { readImage, loadImage, avatarLayout, avatarData, cover };
 })();

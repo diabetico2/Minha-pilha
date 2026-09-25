@@ -4,7 +4,7 @@
   "private": true,
   "description": "Biblioteca pessoal de comics e mangás, publicada no GitHub Pages.",
   "scripts": {
-    "test": "node tests/personal-library.test.cjs && node tests/sync.test.cjs && node tests/site.test.cjs && node tests/catalogue-language.test.cjs",
+    "test": "node tests/personal-library.test.cjs && node tests/sync.test.cjs && node tests/site.test.cjs && node tests/catalogue-language.test.cjs && node tests/media-tools.test.cjs",
     "covers:download": "node tools/download-covers.cjs"
   }
 }

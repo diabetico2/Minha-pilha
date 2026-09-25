@@ -211,7 +211,7 @@
     if (!config?.apiKey || !config?.databaseURL || !config?.projectId) return;
     setStatus('Conectando sua conta…');
     try {
-      const firebase = await import('../vendor/firebase/firebase.js?v=17');
+      const firebase = await import('../vendor/firebase/firebase.js?v=19');
       const instance = firebase.initializeApp(config);
       authAPI = firebase; dataAPI = firebase;
       auth = authAPI.getAuth(instance); auth.languageCode = 'pt-BR';
