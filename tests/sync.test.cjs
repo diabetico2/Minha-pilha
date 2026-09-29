@@ -35,7 +35,7 @@ async function client(server, storage = new Map(), passwordAPI = {}) {
     return elements.get(id);
   };
   const source = fs.readFileSync(path.join(__dirname,'../assets/js/app.js'), 'utf8');
-  const validators = { window: { PilhaPersonal: personal, PilhaProfileModel: profileModel } };
+  const validators = { window: { PilhaReadingModel: require('../assets/js/reading-model.js'), PilhaPersonal: personal, PilhaProfileModel: profileModel } };
   vm.createContext(validators);
   vm.runInContext(source.slice(source.indexOf('  function validateProgress('), source.indexOf('  function ensureCompletionDates(')), validators);
   const app = {
@@ -91,7 +91,7 @@ async function client(server, storage = new Map(), passwordAPI = {}) {
   await test('production app bridge preserves guest memory and switches account caches',()=>{
     const source=fs.readFileSync(path.join(__dirname,'../assets/js/app.js'),'utf8');
     const initial=empty();initial.read.guest=true;
-    const bridgeContext={window:{PilhaPersonal:personal,PilhaProfileModel:profileModel},state:initial,accountId:null,accountMemory:new Map(),orders:[{id:'batman'}],selected:'batman',KEY:'minha-pilha-v1',AUTO_BACKUP_KEY:'minha-pilha-v1-auto-backup',applyingRemote:false,
+    const bridgeContext={window:{PilhaReadingModel:require('../assets/js/reading-model.js'),PilhaPersonal:personal,PilhaProfileModel:profileModel},state:initial,accountId:null,accountMemory:new Map(),orders:[{id:'batman'}],selected:'batman',KEY:'minha-pilha-v1',AUTO_BACKUP_KEY:'minha-pilha-v1-auto-backup',applyingRemote:false,
       $:()=>({open:false,value:''}),load:()=>empty(),showView(){},selectOrder(){},refreshOrders(){},render(){},save(){},toast(){},localStorage:{getItem:()=>null}};
     vm.createContext(bridgeContext);
     vm.runInContext(source.slice(source.indexOf('  function validateProgress('), source.indexOf('  function ensureCompletionDates(')),bridgeContext);
@@ -205,6 +205,14 @@ async function client(server, storage = new Map(), passwordAPI = {}) {
     const api={EmailAuthProvider:{credential:()=>({})},reauthenticateWithCredential:async()=>{throw Object.assign(Error(),{code:'auth/invalid-credential'});},updatePassword:async()=>updates++};
     const a=await client(fakeServer(),new Map(),api);a.login('alice');await assert.rejects(a.cloud.changePassword('wrong','new-password'),/incorreta/);assert.equal(updates,0);
     const b=await client(fakeServer(),new Map(),{...api,reauthenticateWithCredential:()=>pending});b.login('alice');const change=b.cloud.changePassword('old-password','new-password');b.login('bob');release();await assert.rejects(change,/conta mudou/);assert.equal(updates,0);
+  });
+  await test('goals, ratings and trash sync offline across devices and stay private after account switches',async()=>{
+    const server=fakeServer(),a=await client(server),b=await client(server);a.login('alice');b.login('alice');await turn();
+    a.connect(false);a.edit('goals','2026-09',20);a.edit('ratings','batman:0:0',5);
+    const list=makeList(),record=JSON.stringify({list:personal.serialize(list),deletedAt:'2026-09-29T12:00:00Z'});a.edit('trash',list.id,record);
+    a.connect(true);await a.flush();assert.equal(b.app.getProgress().goals['2026-09'],20);assert.equal(b.app.getProgress().ratings['batman:0:0'],5);assert.equal(b.app.getProgress().trash[list.id],record);
+    b.login('bob');await turn();assert.deepEqual(b.app.getProgress().goals,{});assert.deepEqual(b.app.getProgress().trash,{});
+    b.login('alice');await turn();b.edit('trash',list.id,null);await b.flush();assert.equal(a.app.getProgress().trash[list.id],undefined);
   });
   console.log(`${passed} sync tests passed`);
 })().catch(error=>{console.error(error);process.exitCode=1;});

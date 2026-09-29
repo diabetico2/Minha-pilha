@@ -111,12 +111,14 @@
     app.toast('Lista exportada, sem suas notas ou progresso. Envie o JSON a quem quiser.');
   }
   $('#sharePersonalBtn').onclick = () => share(personal.selectedId());
-  function remove(id) {
+  async function remove(id) {
     const value = personal.get(id); if (!value) return;
+    const removingOwner=personal.account();
     const list = model.parse(value, id);
     const scope=personal.account()?'A exclusão será sincronizada com todos os seus dispositivos.':'A exclusão vale para a pilha deste navegador.';
-    if (!confirm(`Excluir “${list.title}”?\n\nSerão removidos os ${list.items.length} itens desta lista, suas marcações e notas. ${scope}\n\nO catálogo padrão e as cópias compartilhadas não serão alterados. Para recuperar depois, salve um backup antes de excluir.`)) return;
-    try { personal.remove(id, value); close(); app.showView('home'); app.toast('Lista pessoal excluída'); } catch (err) { app.toast(err.message); }
+    if (!await window.PilhaReadingUI.confirm(`Mover “${list.title}” para a lixeira?\n\nOs ${list.items.length} itens e seu progresso irão para a lixeira do Diário de leitura. ${scope}\n\nVocê poderá restaurar a lista pela lixeira.`, 'Mover para lixeira')) return;
+    if(removingOwner!==personal.account()){app.toast('A conta mudou. Abra a lista novamente.');return;}
+    try { personal.remove(id, value); close(); app.showView('home'); app.toast('Lista movida para a lixeira do Diário de leitura'); } catch (err) { app.toast(err.message); }
   }
   $('#deletePersonalBtn').classList.add('danger-text');
   $('#deletePersonalBtn').onclick = () => remove(personal.selectedId());

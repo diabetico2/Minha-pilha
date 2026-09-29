@@ -65,6 +65,12 @@ Publique a versão atual de `firebase/database.rules.json` antes dos novos scrip
 
 ## Validação ao alterar a configuração
 
+### Diário, metas e lixeira (versão 2.3)
+
+Os novos mapas privados são `ratings` (inteiros de 1 a 5), `goals` (mês codificado → inteiro de 1 a 10.000) e `trash` (snapshot JSON de uma lista com seu progresso, até 1,6 milhão de caracteres). As regras publicadas mantêm leitura/escrita exclusivas ao proprietário e validam os novos tipos e limites. A estrutura interna de snapshots é validada no cliente; o servidor valida tipo e tamanho da string. O aplicativo limita a lixeira a 20 listas, sem expiração automática.
+
+Histórico, médias, gráfico e metas são calculados no cliente sobre os dados sincronizados. O backup versão 6 inclui os novos campos e aceita versões anteriores. O CSV respeita os filtros atuais e inclui anotações privadas; é destinado à exportação do próprio usuário. Não requer produtos adicionais do Firebase. Detalhes e roteiro de apresentação: [DB2.md](DB2.md).
+
 Teste com duas contas: cada uma deve ver apenas sua pilha. Teste marcar um item em dois dispositivos, remover uma marcação, sair/entrar e reconectar após uma alteração offline. Uma requisição sem login ou com outro UID deve ser negada pelas regras publicadas.
 
 As cotas gratuitas podem mudar: [preços do Firebase](https://firebase.google.com/pricing). Referências: [login com senha](https://firebase.google.com/docs/auth/web/password-auth), [atualizações por campo](https://firebase.google.com/docs/database/web/read-and-write) e [regras de acesso](https://firebase.google.com/docs/database/security).

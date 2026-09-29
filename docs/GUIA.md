@@ -63,13 +63,25 @@ Limites: 100 listas pessoais por pilha, 500 itens por lista e até 200 mil carac
 
 Testes: `node tests/personal-library.test.cjs` e `node tests/sync.test.cjs`. Ao publicar esta versão, atualize primeiro as regras do Firebase com `firebase/database.rules.json`, que inclui `customOrders` e `profile` dentro do caminho privado de cada conta.
 
-## Perfil e imagens
+## Diário, metas e avaliações
+
+Abra **Diário de leitura** no menu para consultar as leituras marcadas, filtrar por título, mês e estrelas, e exportar o resultado em CSV. O gráfico mostra os últimos seis meses. Cabeçalhos de arcos com itens associados não são contados novamente nas metas; isso evita contar um arco e seus itens duas vezes. O histórico corresponde às marcações atuais, não a um registro de releituras.
+
+Escolha um mês, informe uma meta entre 1 e 10.000 leituras e clique em **Salvar meta**. Cada mês tem sua meta. O progresso usa as datas das leituras no fuso horário do dispositivo.
+
+Use **Avaliar / nota** ao lado de uma leitura para dar de 1 a 5 estrelas, escrever uma anotação e corrigir sua data. Avaliações e anotações são privadas. Datas desconhecidas ficam sem data e não contam para metas; backups antigos podem conter a data em que foram importados.
+
+Ao excluir uma lista pessoal, ela vai para **Diário de leitura → Lixeira de listas**, com capa, marcações, anotações, avaliações e ponto de leitura. É possível restaurá-la ou excluir definitivamente após confirmação. Até 20 listas podem ficar na lixeira, sem expiração automática. O backup JSON versão 6 inclui diário (marcações e datas), metas, avaliações e lixeira; compartilhar uma lista continua exportando apenas seu conteúdo.
+
+O backup de código anterior a esta atualização está na tag `backup/pre-diario-metas-56804cd` e no ZIP `minha-pilha-antes-diario-metas-56804cd.zip`. Consulte [o roteiro de DB2](DB2.md) para demonstrar a estrutura e as operações do banco.
+
+## Ajustar o perfil
 
 Entre na conta e clique no seu nome ou em **Meu perfil**. Escolha a foto e ajuste o zoom e a posição dentro do recorte circular. Confirme o recorte, preencha o nome e a apresentação e clique em **Salvar perfil**. Fotos são reduzidas para 192 × 192 e capas para 480 × 320 no navegador antes de serem guardadas no Realtime Database. O arquivo de origem pode ter até 8 MB; o resultado tem limite de 32 mil caracteres para fotos e 100 mil para capas. Não é necessário ativar Firebase Storage ou um plano pago.
 
 As imagens do catálogo ficam em `assets/images/covers/`, servidas junto com o site e com crédito à fonte em cada cartão. Depois de visitadas, ficam disponíveis no cache offline. O catálogo e suas chaves de progresso não foram alterados.
 
-O backup completo em JSON (versão 5) inclui o perfil, as listas com capas e o progresso. Backups antigos continuam válidos; restaurar substitui a pilha pelos dados presentes no arquivo. **Limpar minha estante** preserva o perfil.
+O backup completo em JSON (versão 6) inclui o perfil, as listas com capas, o progresso, as avaliações, as metas e a lixeira. Backups antigos continuam válidos; restaurar substitui a pilha pelos dados presentes no arquivo. **Limpar minha estante** preserva o perfil.
 
 ## Recuperação de senha
 

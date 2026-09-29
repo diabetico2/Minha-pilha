@@ -51,6 +51,8 @@
     for (const field of ['savedAt', 'lastBackupAt']) if (raw[field] != null && !isValidDate(raw[field])) throw new Error('Data inválida');
     if (raw.customOrders !== undefined) window.PilhaPersonal.validateMap(raw.customOrders);
     if (raw.profile !== undefined) window.PilhaProfileModel.validate(raw.profile);
+    for (const field of ['ratings','goals']) if (raw[field] !== undefined) window.PilhaReadingModel.validateMap(raw[field],field);
+    if (raw.trash !== undefined) window.PilhaReadingModel.validateTrash(raw.trash,window.PilhaPersonal);
     return blankState(raw);
   }
   function blankState(raw = {}) {
@@ -63,6 +65,9 @@
       completedAt: raw.completedAt && typeof raw.completedAt === 'object' ? raw.completedAt : {},
       customOrders: raw.customOrders || {},
       profile: raw.profile || {},
+      ratings: raw.ratings || {},
+      goals: raw.goals || {},
+      trash: raw.trash || {},
       lastSelectedOrder: typeof raw.lastSelectedOrder === 'string' ? raw.lastSelectedOrder : null,
       savedAt: raw.savedAt || null,
       lastBackupAt: raw.lastBackupAt || null
@@ -73,14 +78,11 @@
     return typeof value === 'string' && !Number.isNaN(new Date(value).getTime());
   }
 
-  function ensureCompletionDates(target, fallbackDate = new Date().toISOString()) {
+  function ensureCompletionDates(target) {
     if (!target.completedAt || typeof target.completedAt !== 'object') target.completedAt = {};
-    const safeFallback = isValidDate(fallbackDate) ? fallbackDate : new Date().toISOString();
-    Object.keys(target.read || {}).forEach(key => {
-      if (target.read[key] && !isValidDate(target.completedAt[key])) target.completedAt[key] = safeFallback;
-    });
+    // Missing historical dates remain unknown; exporting must not fabricate reading activity.
     Object.keys(target.completedAt).forEach(key => {
-      if (!target.read?.[key]) delete target.completedAt[key];
+      if (!target.read?.[key] || !isValidDate(target.completedAt[key])) delete target.completedAt[key];
     });
   }
 
@@ -118,6 +120,7 @@
     updateSaveStatus();
     window.PilhaHome?.refresh();
     window.PilhaProfileUI?.refresh();
+    window.PilhaReadingUI?.refresh();
   }
 
   function counts(order) {
@@ -303,7 +306,7 @@
     render();
     document.querySelector('.library').scrollIntoView({ behavior: 'smooth' });
   }
-  function render() { renderNav(); renderOrder(); updateStats(); renderFeatured(); updateSaveStatus(); window.PilhaHome?.refresh(); window.PilhaProfileUI?.refresh(); }
+  function render() { renderNav(); renderOrder(); updateStats(); renderFeatured(); updateSaveStatus(); window.PilhaHome?.refresh(); window.PilhaProfileUI?.refresh(); window.PilhaReadingUI?.refresh(); }
 
   function updateCollectionButtons(order) {
     const favorite = Boolean(state.favoriteOrders[order.id]);
@@ -369,7 +372,7 @@
           visible++;
           const note = state.notes[key]?.trim();
           const date = state.completedAt[key];
-          return `<div class="comic-row ${companion ? 'companion-row' : ''} ${read ? 'is-read' : ''} ${current ? 'is-current' : ''}" data-key="${escapeHtml(key)}"><input class="check" type="checkbox" ${read ? 'checked' : ''} aria-label="Marcar ${escapeHtml(entry.title)} como lido"><span class="comic-copy"><strong class="comic-title">${escapeHtml(entry.title)}</strong>${entry.details ? `<span class="comic-details">${escapeHtml(entry.details)}</span>` : ''}<span class="reading-metadata">${read && date ? `<span class="read-date">✓ Lido em ${formatDate(date)}</span>` : ''}${note ? '<span class="note-saved">● Nota salva</span>' : ''}</span></span><span class="row-actions">${arcAction}<button class="note-btn ${note ? 'has-note' : ''}" type="button">${note ? '✎ Nota' : '＋ Nota'}</button><button class="current-btn" type="button" title="${current ? 'Onde parei' : 'Marcar onde parei'}" aria-label="${current ? 'Onde parei' : 'Marcar onde parei'}: ${escapeHtml(entry.title)}">${current ? '★ Onde parei' : '☆ Marcar onde parei'}</button></span></div>`;
+          return `<div class="comic-row ${companion ? 'companion-row' : ''} ${read ? 'is-read' : ''} ${current ? 'is-current' : ''}" data-key="${escapeHtml(key)}"><input class="check" type="checkbox" ${read ? 'checked' : ''} aria-label="Marcar ${escapeHtml(entry.title)} como lido"><span class="comic-copy"><strong class="comic-title">${escapeHtml(entry.title)}</strong>${entry.details ? `<span class="comic-details">${escapeHtml(entry.details)}</span>` : ''}<span class="reading-metadata">${read && date ? `<span class="read-date">✓ Lido em ${formatDate(date)}</span>` : ''}${state.ratings[key] ? `<span class="read-rating">${'★'.repeat(state.ratings[key])}</span>` : ''}${note ? '<span class="note-saved">● Nota salva</span>' : ''}</span></span><span class="row-actions">${arcAction}<button class="note-btn ${note ? 'has-note' : ''}" type="button">${note || state.ratings[key] ? '✎ Avaliar / nota' : '☆ Avaliar / nota'}</button><button class="current-btn" type="button" title="${current ? 'Onde parei' : 'Marcar onde parei'}" aria-label="${current ? 'Onde parei' : 'Marcar onde parei'}: ${escapeHtml(entry.title)}">${current ? '★ Onde parei' : '☆ Marcar onde parei'}</button></span></div>`;
         };
         const main = makeRow(item, mainKey, false, groupAction);
         const companions = (item.companions || []).map((companion, companionIndex) => makeRow(companion, keyFor(order.id, sectionKey, order.personal ? item.key : itemIndex, companionIndex), true)).join('');
@@ -459,6 +462,7 @@
     $('#noteItemTitle').textContent = title;
     $('#noteText').value = state.notes[key] || '';
     $('#deleteNoteBtn').hidden = !state.notes[key];
+    window.PilhaReadingUI?.openEntry(key);
     $('#noteDialog').showModal();
     requestAnimationFrame(() => $('#noteText').focus());
   }
@@ -493,7 +497,7 @@
     state.lastBackupAt = exportedAt;
     ensureCompletionDates(state, exportedAt);
     save();
-    const payload = JSON.stringify({ version: 5, schema: 'minha-pilha-progress', exportedAt, app: 'Minha Pilha', progress: blankState(state) }, null, 2);
+    const payload = JSON.stringify({ version: 6, schema: 'minha-pilha-progress', exportedAt, app: 'Minha Pilha', progress: blankState(state) }, null, 2);
     const blob = new Blob([payload], { type: 'application/json' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -523,9 +527,10 @@
   $('#reminderBackupBtn').onclick = exportProgress;
   $('#saveNoteBtn').onclick = () => {
     if (!activeNoteKey) return;
+    if (window.PilhaReadingUI && !window.PilhaReadingUI.saveEntry(activeNoteKey, state)) return;
     const value = $('#noteText').value.trim();
     if (value) state.notes[activeNoteKey] = value; else delete state.notes[activeNoteKey];
-    save(); $('#noteDialog').close(); renderOrder(); toast(value ? 'Nota salva' : 'Nota removida');
+    save(); $('#noteDialog').close(); renderOrder(); toast('Avaliação, data e anotação salvas');
   };
   $('#deleteNoteBtn').onclick = () => {
     if (!activeNoteKey) return;
@@ -555,7 +560,7 @@
   };
   $('#resetBtn').onclick = () => {
     const scope = accountId ? 'na sua conta e nos dispositivos sincronizados' : 'neste navegador';
-    if (!confirm(`Apagar leituras, notas, favoritos, listas pessoais e toda a sua estante ${scope}?`)) return;
+    if (!confirm(`Apagar leituras, notas, avaliações, metas, lixeira, favoritos, listas pessoais e toda a sua estante ${scope}?`)) return;
     const profile = state.profile;
     Object.keys(state).forEach(key => delete state[key]);
     Object.assign(state, blankState({ profile }));
@@ -583,16 +588,20 @@
   function showView(view, scroll = true) {
     const shelf = view === 'shelf';
     const home = view === 'home';
-    $('#libraryPanel').hidden = shelf || home;
+    const diary = view === 'diary';
+    if ($('#readingPanel')) $('#readingPanel').hidden = !diary;
+    $('#readingViewBtn')?.classList.toggle('active', diary);
+    $('#readingViewBtn')?.setAttribute('aria-pressed', String(diary));
+    $('#libraryPanel').hidden = shelf || home || diary;
     $('#shelfPanel').hidden = !shelf;
     if ($('#homePanel')) $('#homePanel').hidden = !home;
     $('#homeViewBtn')?.classList.toggle('active', home);
     $('#homeViewBtn')?.setAttribute('aria-pressed', String(home));
-    $('#libraryViewBtn').classList.toggle('active', !shelf && !home);
+    $('#libraryViewBtn').classList.toggle('active', !shelf && !home && !diary);
     $('#shelfViewBtn').classList.toggle('active', shelf);
-    $('#libraryViewBtn').setAttribute('aria-pressed', String(!shelf && !home));
+    $('#libraryViewBtn').setAttribute('aria-pressed', String(!shelf && !home && !diary));
     $('#shelfViewBtn').setAttribute('aria-pressed', String(shelf));
-    const heading = home ? '#homeTitle' : shelf ? '#currentTitle' : '#libraryTitle';
+    const heading = diary ? '#readingTitle' : home ? '#homeTitle' : shelf ? '#currentTitle' : '#libraryTitle';
     $('.skip-link').setAttribute('href', heading);
     $(heading)?.setAttribute('tabindex', '-1');
     if (scroll) window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -635,6 +644,33 @@
       state.profile = window.PilhaProfileModel.validate(raw);
       save(); render();
     },
+    reading: {
+      entries: () => orders.flatMap(order => entriesFor(order).map(entry => ({...entry,orderId:order.id,orderTitle:order.title}))),
+      openNote(key) {
+        const entry = this.entries().find(entry=>entry.key===key);
+        if (!entry) throw Error('Leitura não encontrada.');
+        openNote(key,entry.title);
+      },
+      saveGoal(month, value) {
+        if (!window.PilhaReadingModel.monthValid(month)) throw Error('Escolha um mês válido.');
+        if (value === null) delete state.goals[month];
+        else { window.PilhaReadingModel.validateMap({[month]:value},'goals'); state.goals[month]=value; }
+        save();
+      },
+      restore(id, base) {
+        if (!base || state.trash[id] !== base) throw Error('A lixeira mudou. Atualize antes de restaurar.');
+        if (state.customOrders[id]) throw Error('Essa lista já está na biblioteca.');
+        if (Object.keys(state.customOrders).length >= window.PilhaPersonal.MAX_LISTS) throw Error('Sua biblioteca já tem 100 listas pessoais.');
+        const record=window.PilhaReadingModel.parseTrash(base,id,window.PilhaPersonal);
+        state.customOrders[id]=record.list;
+        for (const field of ['read','notes','completedAt','ratings','current','favoriteOrders','queueOrders']) Object.assign(state[field],record[field]);
+        delete state.trash[id]; refreshOrders(); selectOrder(id);
+      },
+      purge(id, base) {
+        if (!base || state.trash[id] !== base) throw Error('A lixeira mudou. Atualize antes de excluir.');
+        delete state.trash[id]; save();
+      }
+    },
     personal: {
       get: id => state.customOrders[id] || null,
       selectedId: () => window.PilhaPersonal.isId(selected) ? selected : null,
@@ -647,7 +683,7 @@
         const next = window.PilhaPersonal.parse(value);
         if (existing) {
           const keep = new Set(next.items.map(item => keyFor(list.id, 'personal', item.id)));
-          for (const field of ['read', 'notes', 'completedAt']) for (const key of Object.keys(state[field])) {
+          for (const field of ['read', 'notes', 'completedAt', 'ratings']) for (const key of Object.keys(state[field])) {
             if (key.startsWith(`${list.id}:`) && !keep.has(key)) delete state[field][key];
           }
           if (state.current[list.id] && !keep.has(state.current[list.id])) delete state.current[list.id];
@@ -658,9 +694,15 @@
       remove(id, base) {
         if (!window.PilhaPersonal.isId(id) || !state.customOrders[id]) throw Error('Lista pessoal não encontrada.');
         if (state.customOrders[id] !== base) throw Error('A lista mudou. Abra a versão atual antes de excluir.');
+        if (Object.keys(state.trash).length >= 20 && !state.trash[id]) throw Error('Sua lixeira tem 20 listas. Restaure ou exclua uma delas antes de continuar.');
+        const record={list:base,deletedAt:new Date().toISOString()};
+        for (const field of ['read','notes','completedAt','ratings','current','favoriteOrders','queueOrders']) record[field]=Object.fromEntries(Object.entries(state[field]).filter(([key])=>key===id||key.startsWith(`${id}:`)));
+        const trashValue=JSON.stringify(record);
+        window.PilhaReadingModel.parseTrash(trashValue,id,window.PilhaPersonal);
+        state.trash[id]=trashValue;
         delete state.customOrders[id];
         for (const field of ['current', 'favoriteOrders', 'queueOrders']) delete state[field][id];
-        for (const field of ['read', 'notes', 'completedAt']) for (const key of Object.keys(state[field])) if (key.startsWith(`${id}:`)) delete state[field][key];
+        for (const field of ['read', 'notes', 'completedAt', 'ratings']) for (const key of Object.keys(state[field])) if (key.startsWith(`${id}:`)) delete state[field][key];
         refreshOrders(); selectOrder(orders[0].id);
       }
     },
@@ -692,7 +734,7 @@
     applyCloud(progress) {
       const incoming = validateProgress(progress);
       // Selection and external-backup dates belong to this device.
-      for (const field of ['read', 'current', 'notes', 'favoriteOrders', 'queueOrders', 'completedAt', 'customOrders', 'profile']) state[field] = incoming[field];
+      for (const field of ['read', 'current', 'notes', 'favoriteOrders', 'queueOrders', 'completedAt', 'customOrders', 'profile', 'ratings', 'goals', 'trash']) state[field] = incoming[field];
       refreshOrders();
       if (!orders.some(order => order.id === selected)) selected = orders[0]?.id;
       applyingRemote = true;

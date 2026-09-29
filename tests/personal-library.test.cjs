@@ -11,7 +11,7 @@ let passed = 0;
 function test(name, run) { run(); passed++; console.log(`PASS ${name}`); }
 function bridge() {
   const builtInOrders=[{id:'batman', title:'Batman', sections:[{key:4, title:'Fase', items:[{title:'Batman #1'}]}]}];
-  const c={window:{PilhaPersonal:model,PilhaProfileModel:require('../assets/js/profile-model.js')}, builtInOrders, orders:builtInOrders, accountId:null,accountMemory:new Map(),selected:'batman',applyingRemote:false,
+  const c={window:{PilhaReadingModel:require('../assets/js/reading-model.js'),PilhaPersonal:model,PilhaProfileModel:require('../assets/js/profile-model.js')}, builtInOrders, orders:builtInOrders, accountId:null,accountMemory:new Map(),selected:'batman',applyingRemote:false,
     $:()=>({open:false,value:''}),load:()=>c.blankState(),showView(){},render(){},save(){},toast(){},localStorage:{getItem:()=>null},
     keyFor:(order,section,item)=>`${order}:${section}:${item}`,selectOrder:id=>{c.selected=id}};
   vm.createContext(c);
@@ -97,5 +97,25 @@ test('cache manifest includes each versioned runtime and stylesheet',()=>{
   const html=fs.readFileSync(path.join(root,'index.html'),'utf8'),sw=fs.readFileSync(path.join(root,'sw.js'),'utf8');
   const files=[...html.matchAll(/(?:src|href)="([^"?#]+\.(?:js|css)(?:\?[^"#]+)?)"/g)].map(match=>match[1]);
   for(const file of files){assert.ok(sw.includes(`'./${file}'`),file);assert.ok(fs.existsSync(path.join(root,file.split('?')[0])),file);}
+});
+test('trash restores the list, reading dates, notes, ratings and collections without touching other lists',()=>{
+  const c=bridge(),app=c.window.PilhaApp,list=fixture();app.personal.save(list);
+  const key=`${list.id}:personal:${list.items[0].id}`;
+  c.state.read[key]=true;c.state.notes[key]='Minha anotação';c.state.ratings[key]=5;c.state.completedAt[key]='2026-09-22T12:00:00Z';c.state.current[list.id]=key;c.state.favoriteOrders[list.id]=true;
+  c.state.notes['batman:4:0']='Preservar';
+  const before=app.personal.get(list.id);app.personal.remove(list.id,before);
+  const removed=app.getProgress(),record=removed.trash[list.id];assert.ok(record);assert.equal(removed.ratings[key],undefined);
+  assert.doesNotThrow(()=>app.validate(removed));
+  app.reading.restore(list.id,record);
+  assert.equal(app.personal.get(list.id),before);assert.equal(c.state.read[key],true);assert.equal(c.state.notes[key],'Minha anotação');assert.equal(c.state.ratings[key],5);assert.equal(c.state.completedAt[key],'2026-09-22T12:00:00Z');assert.equal(c.state.current[list.id],key);assert.equal(c.state.favoriteOrders[list.id],true);assert.equal(c.state.notes['batman:4:0'],'Preservar');
+  assert.equal(c.state.trash[list.id],undefined);assert.throws(()=>app.reading.restore(list.id,record));
+  app.personal.remove(list.id,before);app.reading.purge(list.id,c.state.trash[list.id]);assert.equal(c.state.trash[list.id],undefined);
+});
+test('monthly goals and trash remain isolated by account and older backups get empty maps',()=>{
+  const c=bridge(),app=c.window.PilhaApp;
+  app.setAccount('alice');app.reading.saveGoal('2026-09',20);assert.equal(app.getProgress().goals['2026-09'],20);
+  app.setAccount('bob');assert.deepEqual(clone(app.getProgress().goals),{});app.setAccount('alice');assert.equal(app.getProgress().goals['2026-09'],20);
+  assert.throws(()=>app.reading.saveGoal('2026-13',5));assert.throws(()=>app.reading.saveGoal('2026-09',2.5));app.reading.saveGoal('2026-09',null);assert.deepEqual(clone(app.getProgress().goals),{});
+  const legacy=app.validate({read:{}});for(const field of ['ratings','goals','trash'])assert.deepEqual(clone(legacy[field]),{});
 });
 console.log(`${passed} personal library tests passed`);
