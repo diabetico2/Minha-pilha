@@ -25,3 +25,11 @@ vm.runInContext(source.slice(source.indexOf('  function ensureCompletionDates(')
 const old={read:{unknown:true,known:true},completedAt:{known:'2026-08-22T12:00:00Z',unread:'2026-09-29T12:00:00Z'}};
 context.ensureCompletionDates(old);assert.equal(old.completedAt.unknown,undefined);assert.equal(old.completedAt.known,'2026-08-22T12:00:00Z');assert.equal(old.completedAt.unread,undefined);
 console.log('PASS backup normalization preserves unknown dates instead of inventing activity');
+for(const value of ['[]',JSON.stringify(['suspense','mangás'])])assert.doesNotThrow(()=>model.parseTags(value));
+for(const value of ['null','{}','[1]','["","a"]','["a","a"]',JSON.stringify(['x'.repeat(31)]),JSON.stringify(Array(11).fill('x'))])assert.throws(()=>model.parseTags(value));
+const repeat={key:'child',date:'2026-09-29T12:00:00Z',rating:4,note:'Releitura'};
+for(const invalid of [{...repeat,rating:6},{...repeat,date:'invalid'},{...repeat,note:8},{...repeat,profile:'leak'}])assert.throws(()=>model.parseSession(JSON.stringify(invalid)));
+progress.sessions={one:JSON.stringify(repeat)};assert.equal(model.history(entries,progress).filter(r=>r.sessionId).length,1);assert.equal(model.history(entries,progress).find(r=>r.sessionId).note,'Releitura');
+const catalogue=[{key:'a',title:'Batman collection',details:'Batman #520–530, 550 & 560-562',orderTitle:'Batman'}, {key:'b',title:'Different collection',details:'Detective Comics #515-526; Batman #349-359',orderTitle:'Batman'}, {key:'c',title:'Batman (2016) #526',orderTitle:'Another list'}, {key:'d',title:'Caçador de Marte #1',orderTitle:'JLA'}];
+assert.deepEqual(model.search(catalogue,'Batman #526').map(r=>r.key),['a','c']);assert.deepEqual(model.search(catalogue,'Batman #561').map(r=>r.key),['a']);assert.deepEqual(model.search(catalogue,'Batman #55'),[]);assert.deepEqual(model.search(catalogue,'cacador marte').map(r=>r.key),['d']);assert.deepEqual(model.search(catalogue,' '),[]);
+console.log('PASS reread validation, private tags and issue search distinguish series and support ranges');

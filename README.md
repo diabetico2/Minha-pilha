@@ -1,6 +1,6 @@
 # Minha Pilha
 
-Biblioteca pessoal de quadrinhos e mangás, com ordens de leitura, diário, metas mensais, avaliações, anotações, listas próprias, lixeira e perfil sincronizado.
+Biblioteca pessoal de quadrinhos e mangás, com ordens de leitura, diário com releituras, tags pessoais, busca global, compartilhamento por link, metas mensais, avaliações, anotações, listas próprias, lixeira e perfil sincronizado.
 
 **[Abrir o site](https://diabetico2.github.io/Minha-pilha/)** · [Guia de uso](docs/GUIA.md) · [Firebase e sincronização](docs/FIREBASE.md) · [Roteiro de apresentação de DB2](docs/DB2.md)
 
@@ -52,6 +52,7 @@ Mover arquivos do site não muda as chaves do armazenamento local nem o endereç
 
 ## Versões preservadas
 
+- Antes de releituras, tags e links públicos: tag `backup/pre-releituras-links-c3a4329`.
 - Antes dos perfis: tag `backup/pre-perfis-80da19a`.
 - Antes do diário, metas e lixeira: tag `backup/pre-diario-metas-56804cd` e ZIP `minha-pilha-antes-diario-metas-56804cd.zip`.
 - Antes desta organização: commit `f8697d2` e ZIP `minha-pilha-antes-da-organizacao-f8697d2.zip` na pasta de backups entregue separadamente.

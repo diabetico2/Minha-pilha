@@ -118,4 +118,19 @@ test('monthly goals and trash remain isolated by account and older backups get e
   assert.throws(()=>app.reading.saveGoal('2026-13',5));assert.throws(()=>app.reading.saveGoal('2026-09',2.5));app.reading.saveGoal('2026-09',null);assert.deepEqual(clone(app.getProgress().goals),{});
   const legacy=app.validate({read:{}});for(const field of ['ratings','goals','trash'])assert.deepEqual(clone(legacy[field]),{});
 });
+test('tags and rereads back up, survive edits and trash, reject stale writes and stay private',()=>{
+  const c=bridge(),app=c.window.PilhaApp,list=fixture(),reading=c.window.PilhaReadingModel;
+  app.setAccount('alice');app.personal.save(list);const key=`${list.id}:personal:${list.items[0].id}`,sid='session-'+randomUUID();
+  c.state.read[key]=true;c.state.completedAt[key]='2026-08-20T12:00:00Z';c.state.notes[key]='first note';c.state.ratings[key]=3;
+  app.saveTags('batman',['suspense'],null);app.saveTags(list.id,['favoritos'],null);
+  app.reading.saveSession(sid,{key,date:'2026-09-29T12:00:00Z',rating:5,note:'second note'});
+  const history=reading.history(app.reading.entries(),app.getProgress());assert.equal(history.length,2);assert.equal(history[0].rating,5);assert.equal(history[1].note,'first note');
+  const backup=app.getProgress();assert.doesNotThrow(()=>app.validate(backup));assert.throws(()=>app.saveTags('batman',['other'],null),/mudaram/);assert.throws(()=>app.reading.saveSession(sid,null),/mudou/);
+  const shared=model.share(model.parse(app.personal.get(list.id)));assert.equal(JSON.stringify(shared).includes('second note'),false);assert.equal(JSON.stringify(shared).includes('favoritos'),false);
+  app.personal.remove(list.id,app.personal.get(list.id));assert.equal(c.state.sessions[sid],undefined);assert.equal(c.state.tags[list.id],undefined);assert.ok(c.state.tags.batman);
+  app.reading.restore(list.id,c.state.trash[list.id]);assert.equal(c.state.sessions[sid],backup.sessions[sid]);assert.equal(c.state.tags[list.id],backup.tags[list.id]);
+  app.setAccount('bob');assert.deepEqual(clone(c.state.sessions),{});assert.deepEqual(clone(c.state.tags),{});app.setAccount('alice');assert.ok(c.state.sessions[sid]);
+  list.items.shift();app.personal.save(list,app.personal.get(list.id));assert.equal(c.state.sessions[sid],undefined);
+  for(const field of ['sessions','tags'])assert.deepEqual(clone(app.validate({read:{}})[field]),{});
+});
 console.log(`${passed} personal library tests passed`);

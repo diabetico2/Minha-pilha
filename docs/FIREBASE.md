@@ -74,3 +74,9 @@ Histórico, médias, gráfico e metas são calculados no cliente sobre os dados 
 Teste com duas contas: cada uma deve ver apenas sua pilha. Teste marcar um item em dois dispositivos, remover uma marcação, sair/entrar e reconectar após uma alteração offline. Uma requisição sem login ou com outro UID deve ser negada pelas regras publicadas.
 
 As cotas gratuitas podem mudar: [preços do Firebase](https://firebase.google.com/pricing). Referências: [login com senha](https://firebase.google.com/docs/auth/web/password-auth), [atualizações por campo](https://firebase.google.com/docs/database/web/read-and-write) e [regras de acesso](https://firebase.google.com/docs/database/security).
+
+## Campos da versão 2.4
+
+Publique `firebase/database.rules.json` antes de atualizar o site. A regra mantém `/piles/UID` privado e adiciona os mapas `tags` (strings JSON até 400 caracteres) e `sessions` (strings JSON até 8.000 caracteres). A aplicação valida os conteúdos internos. O backup privado passa à versão 7.
+
+`/sharedLists/UID/personal-UUID` é uma cópia pública opcional com `content` e `updatedAt`. Apenas o dono escreve ou lista suas publicações; visitantes leem somente links conhecidos. Campos extras são recusados. A publicação usa uma seleção explícita de conteúdo, sem perfil ou progresso. Não é preciso ativar Functions, Storage, faturamento ou outro produto.

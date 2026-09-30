@@ -101,7 +101,8 @@
       close(); app.toast('Lista pessoal salva');
     } catch (err) { error(err.message); }
   };
-  function share(id) {
+  function share(id) { if(window.PilhaExtras)return window.PilhaExtras.share(id); download(id); }
+  function download(id) {
     const value = personal.get(id); if (!value) return;
     const list = model.parse(value, id);
     const url = URL.createObjectURL(new Blob([JSON.stringify(model.share(list), null, 2)], { type: 'application/json' }));
@@ -134,6 +135,6 @@
     } catch (err) { app.toast(err instanceof SyntaxError ? 'O arquivo não contém um JSON válido.' : err.message); }
     finally { event.target.value = ''; }
   };
-  window.PilhaPersonalUI = { close, edit, share, remove, selected(id) { actions.hidden = !id; } };
+  window.PilhaPersonalUI = { close, edit, share, download, receive(raw){open(model.importShare(raw,makeId),null,true);}, remove, selected(id) { actions.hidden = !id; } };
   window.PilhaPersonalUI.selected(personal.selectedId());
 })();

@@ -51,7 +51,7 @@
     for (const field of ['savedAt', 'lastBackupAt']) if (raw[field] != null && !isValidDate(raw[field])) throw new Error('Data inválida');
     if (raw.customOrders !== undefined) window.PilhaPersonal.validateMap(raw.customOrders);
     if (raw.profile !== undefined) window.PilhaProfileModel.validate(raw.profile);
-    for (const field of ['ratings','goals']) if (raw[field] !== undefined) window.PilhaReadingModel.validateMap(raw[field],field);
+    for (const field of ['ratings','goals','tags','sessions']) if (raw[field] !== undefined) window.PilhaReadingModel.validateMap(raw[field],field);
     if (raw.trash !== undefined) window.PilhaReadingModel.validateTrash(raw.trash,window.PilhaPersonal);
     return blankState(raw);
   }
@@ -68,6 +68,8 @@
       ratings: raw.ratings || {},
       goals: raw.goals || {},
       trash: raw.trash || {},
+      tags: raw.tags || {},
+      sessions: raw.sessions || {},
       lastSelectedOrder: typeof raw.lastSelectedOrder === 'string' ? raw.lastSelectedOrder : null,
       savedAt: raw.savedAt || null,
       lastBackupAt: raw.lastBackupAt || null
@@ -139,8 +141,8 @@
     order.sections.forEach((section, sectionIndex) => section.items.forEach((item, itemIndex) => {
       const sectionKey = section.key ?? sectionIndex;
       const companions = item.companions || [];
-      entries.push({ key: keyFor(order.id, sectionKey, order.personal ? item.key : itemIndex), title: item.title, hasCompanions: companions.length > 0 });
-      companions.forEach((companion, companionIndex) => entries.push({ key: keyFor(order.id, sectionKey, order.personal ? item.key : itemIndex, companionIndex), title: companion.title, isCompanion: true }));
+      entries.push({ key: keyFor(order.id, sectionKey, order.personal ? item.key : itemIndex), title: item.title, details: item.details || '', hasCompanions: companions.length > 0 });
+      companions.forEach((companion, companionIndex) => entries.push({ key: keyFor(order.id, sectionKey, order.personal ? item.key : itemIndex, companionIndex), title: companion.title, details: companion.details || '', isCompanion: true }));
     }));
     return entries;
   }
@@ -497,7 +499,7 @@
     state.lastBackupAt = exportedAt;
     ensureCompletionDates(state, exportedAt);
     save();
-    const payload = JSON.stringify({ version: 6, schema: 'minha-pilha-progress', exportedAt, app: 'Minha Pilha', progress: blankState(state) }, null, 2);
+    const payload = JSON.stringify({ version: 7, schema: 'minha-pilha-progress', exportedAt, app: 'Minha Pilha', progress: blankState(state) }, null, 2);
     const blob = new Blob([payload], { type: 'application/json' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -551,6 +553,7 @@
       Object.keys(state).forEach(key => delete state[key]);
       Object.assign(state, imported);
       window.PilhaPersonalUI?.close();
+      window.PilhaExtras?.closePrivate();
       refreshOrders();
       selected = orders.some(order => order.id === state.lastSelectedOrder) ? state.lastSelectedOrder : orders[0]?.id;
       query = ''; era = 'all'; filter = 'all'; $('#searchInput').value = '';
@@ -560,7 +563,7 @@
   };
   $('#resetBtn').onclick = () => {
     const scope = accountId ? 'na sua conta e nos dispositivos sincronizados' : 'neste navegador';
-    if (!confirm(`Apagar leituras, notas, avaliações, metas, lixeira, favoritos, listas pessoais e toda a sua estante ${scope}?`)) return;
+    if (!confirm(`Apagar leituras, releituras, tags, notas, avaliações, metas, lixeira, favoritos, listas pessoais e toda a sua estante ${scope}? Links já publicados continuam ativos; gerencie-os em “Meus links públicos”.`)) return;
     const profile = state.profile;
     Object.keys(state).forEach(key => delete state[key]);
     Object.assign(state, blankState({ profile }));
@@ -637,6 +640,17 @@
     empty: blankState,
     catalogue: () => orders.map(order => ({ id: order.id, title: order.title, publisher: order.publisher, family: order.family, description: order.description || '', personal: !!order.personal, cover: order.cover || '', progress: counts(order) })),
     openOrder: selectOrder,
+    openEntry(key) {
+      const entry=this.reading.entries().find(e=>e.key===key); if(!entry)return;
+      selectOrder(entry.orderId);
+      requestAnimationFrame(()=>{const row=[...document.querySelectorAll('.comic-row')].find(el=>el.dataset.key===key);if(!row)return;const detail=row.closest('details');if(detail){detail.open=true;expandedGroups.add(detail.dataset.detail);}row.classList.add('next-target');row.scrollIntoView({behavior:'smooth',block:'center'});row.querySelector('.check')?.focus({preventScroll:true});setTimeout(()=>row.classList.remove('next-target'),2400);});
+    },
+    saveTags(id,tags,base) {
+      if(!orders.some(o=>o.id===id))throw Error('Lista não encontrada.');
+      if((state.tags[id]||null)!==base)throw Error('As tags mudaram. Abra o editor novamente.');
+      const value=JSON.stringify(tags);window.PilhaReadingModel.parseTags(value);
+      if(tags.length)state.tags[id]=value;else delete state.tags[id];save();
+    },
     showView,
     getProfile: () => ({ ...state.profile }),
     saveProfile(raw) {
@@ -651,6 +665,14 @@
         if (!entry) throw Error('Leitura não encontrada.');
         openNote(key,entry.title);
       },
+      saveSession(id,raw,base=null) {
+        if((state.sessions[id]||null)!==base)throw Error('A releitura mudou. Abra novamente.');
+        if(!/^session-[a-z0-9-]{36}$/.test(id))throw Error('Identificador inválido.');
+        if(raw===null){delete state.sessions[id];save();return;}
+        const value=JSON.stringify(raw),record=window.PilhaReadingModel.parseSession(value);
+        if(!this.entries().some(e=>e.key===record.key&&!e.hasCompanions))throw Error('Escolha uma edição, e não o cabeçalho do arco.');
+        state.sessions[id]=value;save();
+      },
       saveGoal(month, value) {
         if (!window.PilhaReadingModel.monthValid(month)) throw Error('Escolha um mês válido.');
         if (value === null) delete state.goals[month];
@@ -663,7 +685,7 @@
         if (Object.keys(state.customOrders).length >= window.PilhaPersonal.MAX_LISTS) throw Error('Sua biblioteca já tem 100 listas pessoais.');
         const record=window.PilhaReadingModel.parseTrash(base,id,window.PilhaPersonal);
         state.customOrders[id]=record.list;
-        for (const field of ['read','notes','completedAt','ratings','current','favoriteOrders','queueOrders']) Object.assign(state[field],record[field]);
+        for (const field of ['read','notes','completedAt','ratings','current','favoriteOrders','queueOrders','tags','sessions']) Object.assign(state[field],record[field]);
         delete state.trash[id]; refreshOrders(); selectOrder(id);
       },
       purge(id, base) {
@@ -686,6 +708,7 @@
           for (const field of ['read', 'notes', 'completedAt', 'ratings']) for (const key of Object.keys(state[field])) {
             if (key.startsWith(`${list.id}:`) && !keep.has(key)) delete state[field][key];
           }
+          for(const [id,value] of Object.entries(state.sessions)){const key=window.PilhaReadingModel.parseSession(value).key;if(key.startsWith(`${list.id}:`)&&!keep.has(key))delete state.sessions[id];}
           if (state.current[list.id] && !keep.has(state.current[list.id])) delete state.current[list.id];
         }
         state.customOrders[list.id] = value;
@@ -697,10 +720,13 @@
         if (Object.keys(state.trash).length >= 20 && !state.trash[id]) throw Error('Sua lixeira tem 20 listas. Restaure ou exclua uma delas antes de continuar.');
         const record={list:base,deletedAt:new Date().toISOString()};
         for (const field of ['read','notes','completedAt','ratings','current','favoriteOrders','queueOrders']) record[field]=Object.fromEntries(Object.entries(state[field]).filter(([key])=>key===id||key.startsWith(`${id}:`)));
+        record.tags=state.tags[id]?{[id]:state.tags[id]}:{};
+        record.sessions=Object.fromEntries(Object.entries(state.sessions).filter(([,value])=>window.PilhaReadingModel.parseSession(value).key.startsWith(`${id}:`)));
         const trashValue=JSON.stringify(record);
         window.PilhaReadingModel.parseTrash(trashValue,id,window.PilhaPersonal);
         state.trash[id]=trashValue;
-        delete state.customOrders[id];
+        delete state.customOrders[id];delete state.tags[id];
+        for(const sessionId of Object.keys(record.sessions))delete state.sessions[sessionId];
         for (const field of ['current', 'favoriteOrders', 'queueOrders']) delete state[field][id];
         for (const field of ['read', 'notes', 'completedAt', 'ratings']) for (const key of Object.keys(state[field])) if (key.startsWith(`${id}:`)) delete state[field][key];
         refreshOrders(); selectOrder(orders[0].id);
@@ -723,6 +749,7 @@
       AUTO_BACKUP_KEY = `${KEY}-auto-backup`;
       if ($('#noteDialog').open) $('#noteDialog').close();
       window.PilhaPersonalUI?.close();
+      window.PilhaExtras?.closePrivate();
       Object.keys(state).forEach(key => delete state[key]);
       Object.assign(state, accountMemory.has(accountId) ? JSON.parse(JSON.stringify(accountMemory.get(accountId))) : load());
       refreshOrders();
@@ -734,7 +761,7 @@
     applyCloud(progress) {
       const incoming = validateProgress(progress);
       // Selection and external-backup dates belong to this device.
-      for (const field of ['read', 'current', 'notes', 'favoriteOrders', 'queueOrders', 'completedAt', 'customOrders', 'profile', 'ratings', 'goals', 'trash']) state[field] = incoming[field];
+      for (const field of ['read', 'current', 'notes', 'favoriteOrders', 'queueOrders', 'completedAt', 'customOrders', 'profile', 'ratings', 'goals', 'trash', 'tags', 'sessions']) state[field] = incoming[field];
       refreshOrders();
       if (!orders.some(order => order.id === selected)) selected = orders[0]?.id;
       applyingRemote = true;

@@ -96,6 +96,24 @@
   }
   window.PilhaCloud = {
     changed,
+    async shared(id,content) {
+      const user=auth?.currentUser;
+      if(!available||!user||!session?.connected)throw Error('Entre na conta e conecte-se à internet para compartilhar.');
+      if(!window.PilhaPersonal.isId(id))throw Error('Lista inválida.');
+      // Only the explicit public schema is ever copied from private state.
+      let payload=null;
+      if(content!==null){const list=window.PilhaPersonal.parse(app.personal.get(id),id);payload={content:JSON.stringify(window.PilhaPersonal.share(list)),updatedAt:new Date().toISOString()};if(payload.content.length>200000)throw Error('Lista muito grande para compartilhar.');}
+      const uid=user.uid;
+      await dataAPI.update(dataAPI.ref(database,`sharedLists/${uid}`),{[id]:payload});
+      if(auth.currentUser?.uid!==uid)throw Error('A conta mudou. Verifique seus links ao entrar novamente.');
+      return uid;
+    },
+    async publications() {
+      const uid=auth?.currentUser?.uid;if(!available||!uid)throw Error('Entre na conta para gerenciar seus links.');
+      const snapshot=await dataAPI.get(dataAPI.ref(database,`sharedLists/${uid}`));
+      if(auth.currentUser?.uid!==uid)throw Error('A conta mudou. Abra novamente.');
+      return snapshot.val()||{};
+    },
     user: () => auth?.currentUser ? { uid: auth.currentUser.uid, email: auth.currentUser.email } : null,
     openAccount() { updateAccountUI(auth?.currentUser); window.PilhaProfileUI?.open(); dialog.showModal(); },
     async changePassword(current, next) {
@@ -211,7 +229,7 @@
     if (!config?.apiKey || !config?.databaseURL || !config?.projectId) return;
     setStatus('Conectando sua conta…');
     try {
-      const firebase = await import('../vendor/firebase/firebase.js?v=20');
+      const firebase = await import('../vendor/firebase/firebase.js?v=21');
       const instance = firebase.initializeApp(config);
       authAPI = firebase; dataAPI = firebase;
       auth = authAPI.getAuth(instance); auth.languageCode = 'pt-BR';

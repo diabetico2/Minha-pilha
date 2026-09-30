@@ -14,7 +14,7 @@ const turn = () => new Promise(resolve => setImmediate(resolve));
 
 function fakeServer() {
   const data = new Map(), listeners = new Map();
-  return { data, listeners, writes: [],
+  return { data, listeners, writes: [], shares: new Map(),
     publish(uid) { for (const fn of listeners.get(uid) || []) fn({ val: () => clone(data.get(uid) || null) }); },
     async write(uid, patch) {
       this.writes.push({ uid, patch: clone(patch) });
@@ -39,6 +39,7 @@ async function client(server, storage = new Map(), passwordAPI = {}) {
   vm.createContext(validators);
   vm.runInContext(source.slice(source.indexOf('  function validateProgress('), source.indexOf('  function ensureCompletionDates(')), validators);
   const app = {
+    personal: {get:id=>state.customOrders[id]||null},
     getProgress:()=>clone(state), empty, validate:raw=>clone(validators.validateProgress(raw)),
     guestProgress:()=>clone(guest),
     setAccount(id) { uid=id; state=clone(id ? cache.get(id) || empty() : guest); return clone(state); },
@@ -59,11 +60,12 @@ async function client(server, storage = new Map(), passwordAPI = {}) {
       ownListeners.push(()=>server.listeners.get(owner).delete(fn));
       return ()=>server.listeners.get(owner).delete(fn);
     },
-    async update(route, patch) { if(blockWrite)await blockWrite; await server.write(route.split('/')[1],patch); }
+    get:async route=>({val:()=>clone(server.shares.get(route.split('/')[1])||null)}),
+    async update(route, patch) { if(blockWrite)await blockWrite; if(route.startsWith('sharedLists/')){const uid=route.split('/')[1],value=server.shares.get(uid)||{};for(const [id,record] of Object.entries(patch)){if(record===null)delete value[id];else value[id]=clone(record);}server.shares.set(uid,value);return;} await server.write(route.split('/')[1],patch); }
   };
   let timer=0;
   const context = {
-    window:{PilhaApp:app,PilhaSyncModel:model,MINHA_PILHA_FIREBASE:{apiKey:'test',databaseURL:'test',projectId:'test'},addEventListener:(name,fn)=>handlers[name]=fn},
+    window:{PilhaApp:app,PilhaPersonal:personal,PilhaSyncModel:model,MINHA_PILHA_FIREBASE:{apiKey:'test',databaseURL:'test',projectId:'test'},addEventListener:(name,fn)=>handlers[name]=fn},
     document:{querySelector:element,createElement:()=>element(`created-${elements.size}`),body:{append(){}}},
     navigator:{locks:{request:async(name,fn)=>fn()}}, crypto:require('node:crypto').webcrypto,
     localStorage:{get length(){return storage.size},key:index=>[...storage.keys()][index],getItem:key=>storage.get(key)||null,setItem(key,value){if(failStorage)throw Error('quota');storage.set(key,value)},removeItem:key=>storage.delete(key)},
@@ -213,6 +215,21 @@ async function client(server, storage = new Map(), passwordAPI = {}) {
     a.connect(true);await a.flush();assert.equal(b.app.getProgress().goals['2026-09'],20);assert.equal(b.app.getProgress().ratings['batman:0:0'],5);assert.equal(b.app.getProgress().trash[list.id],record);
     b.login('bob');await turn();assert.deepEqual(b.app.getProgress().goals,{});assert.deepEqual(b.app.getProgress().trash,{});
     b.login('alice');await turn();b.edit('trash',list.id,null);await b.flush();assert.equal(a.app.getProgress().trash[list.id],undefined);
+  });
+  await test('tags and separate rereads merge across devices, persist offline and remain account scoped',async()=>{
+    const server=fakeServer(),a=await client(server),b=await client(server);a.login('alice');b.login('alice');await turn();
+    const record=JSON.stringify({key:'batman:0:0',date:'2026-09-29T12:00:00Z',rating:5,note:'private'});
+    a.connect(false);a.edit('sessions','first',record);a.edit('tags','batman','["suspense"]');b.edit('sessions','second',record);await b.flush();a.connect(true);await a.flush();
+    assert.equal(Object.keys(b.app.getProgress().sessions).length,2);assert.equal(b.app.getProgress().tags.batman,'["suspense"]');
+    b.login('bob');await turn();assert.deepEqual(b.app.getProgress().sessions,{});assert.deepEqual(b.app.getProgress().tags,{});
+    b.login('alice');await turn();b.edit('sessions','first',null);await b.flush();assert.equal(a.app.getProgress().sessions.first,undefined);assert.ok(a.app.getProgress().sessions.second);
+  });
+  await test('production sharing controller publishes only explicit content and revokes after private deletion',async()=>{
+    const server=fakeServer(),a=await client(server),list=makeList();
+    await assert.rejects(a.cloud.shared(list.id,true),/Entre/);a.login('alice');a.edit('customOrders',list.id,personal.serialize(list));a.edit('notes','secret','PRIVATE NOTE');a.edit('tags',list.id,'["PRIVATE TAG"]');await a.flush();
+    assert.equal(await a.cloud.shared(list.id,true),'alice');const publications=await a.cloud.publications();assert.deepEqual(JSON.parse(publications[list.id].content),personal.share(list));assert.equal(JSON.stringify(publications).includes('PRIVATE'),false);
+    a.connect(false);await assert.rejects(a.cloud.shared(list.id,true),/conecte-se/);a.connect(true);a.edit('customOrders',list.id,null);await a.flush();assert.ok((await a.cloud.publications())[list.id]);await a.cloud.shared(list.id,null);assert.deepEqual(clone(await a.cloud.publications()),{});
+    a.login('bob');assert.deepEqual(clone(await a.cloud.publications()),{});
   });
   console.log(`${passed} sync tests passed`);
 })().catch(error=>{console.error(error);process.exitCode=1;});

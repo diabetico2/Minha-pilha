@@ -84,6 +84,37 @@
             ".validate": "newData.isString() && newData.val().length <= 1600000"
           },
           ".validate": "newData.hasChildren()"
+        },
+        "tags": {
+          ".validate": "newData.hasChildren()",
+          "$key": {
+            ".validate": "newData.isString() && newData.val().length <= 400"
+          }
+        },
+        "sessions": {
+          ".validate": "newData.hasChildren()",
+          "$key": {
+            ".validate": "newData.isString() && newData.val().length <= 8000"
+          }
+        }
+      }
+    },
+    "sharedLists": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$listId": {
+          ".read": true,
+          ".write": "auth != null && auth.uid === $uid && $listId.matches(/^personal-[a-z0-9-]{36}$/)",
+          ".validate": "newData.hasChildren(['content','updatedAt'])",
+          "content": {
+            ".validate": "newData.isString() && newData.val().length <= 200000"
+          },
+          "updatedAt": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "$other": {
+            ".validate": false
+          }
         }
       }
     }
