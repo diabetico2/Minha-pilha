@@ -9,6 +9,7 @@ Cada conta guarda sua pilha em `/piles/UID`. As regras exigem que `auth.uid` sej
 | Campo | Conteúdo | Exemplo conceitual antes de codificar a chave |
 | --- | --- | --- |
 | read | Marcações de leitura | item → true |
+| issueRead | Estado canônico de cada edição; inclui desmarcações explícitas | série/versão/número → JSON com read e date |
 | completedAt | Data da última marcação de cada item | item → data ISO |
 | notes | Anotações privadas | item → texto |
 | ratings | Avaliação inteira de 1 a 5 | item → 5 |
@@ -32,7 +33,8 @@ As chaves dos mapas são codificadas em hexadecimal UTF-8 para evitar caracteres
 7. Abrir a mesma conta em outro navegador, alterar uma meta e observar a sincronização.
 8. Desconectar a rede, alterar um dado e reconectar. A fila local envia a alteração pendente.
 9. Entrar em outra conta e demonstrar a separação das pilhas. A restrição também é aplicada no servidor, pelas regras.
-10. Exportar o backup JSON versão 7 e conferir os novos mapas. Backups anteriores continuam aceitos.
+10. Exportar o backup JSON versão 8 e conferir os novos mapas. Backups anteriores continuam aceitos.
+11. Na lista de Batman, abrir King Tut’s Tomb, marcar Batman #353 e observar a mesma edição marcada em Tales of the Batman: Gerry Conway Vol. 3, na lista de Jason Todd. Mostrar `issueRead` no console e desmarcar a edição pelo segundo encadernado. [Modelo e limitações](EDICOES.md).
 
 ## Consultas e decisões de modelagem
 

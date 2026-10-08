@@ -96,6 +96,12 @@
           "$key": {
             ".validate": "newData.isString() && newData.val().length <= 8000"
           }
+        },
+        "issueRead": {
+          ".validate": "newData.hasChildren()",
+          "$key": {
+            ".validate": "newData.isString() && newData.val().length <= 120"
+          }
         }
       }
     },

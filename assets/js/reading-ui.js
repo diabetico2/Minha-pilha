@@ -29,9 +29,9 @@
   confirmation.innerHTML='<form method="dialog"><h2 id="readingConfirmTitle">Confirmar exclusão</h2><p id="readingConfirmMessage" style="white-space:pre-wrap"></p><div class="reading-actions"><button class="dialog-secondary" value="cancel" autofocus>Cancelar</button><button class="dialog-primary" value="confirm" id="readingConfirmAccept">Confirmar</button></div></form>';
   document.body.append(confirmation);
   function confirmAction(message,label){$('#readingConfirmMessage').textContent=message;$('#readingConfirmAccept').textContent=label;confirmation.returnValue='cancel';confirmation.showModal();return new Promise(resolve=>confirmation.addEventListener('close',()=>resolve(confirmation.returnValue==='confirm'),{once:true}));}
-  function rows(){return model.history(app.reading.entries(),app.getProgress());}
+  function rows(){return model.history(app.reading.entries(),app.getReadingProgress());}
   function goalRefresh(all=rows()) {
-    const month=$('#goalMonth').value,goal=app.getProgress().goals[month],done=all.filter(r=>model.monthOf(r.date)===month).length;
+    const month=$('#goalMonth').value,goal=app.getReadingProgress().goals[month],done=all.filter(r=>model.monthOf(r.date)===month).length;
     $('#goalSummary').textContent=goal?`${done} de ${goal} leituras · ${Math.round(done/goal*100)}%${done>=goal?' — Meta alcançada!':''}`:`${done} leituras neste mês. Defina uma meta para acompanhar.`;
     $('#goalProgress').max=goal||1;$('#goalProgress').value=goal?Math.min(done,goal):0;
     $('#removeGoal').disabled=!goal;
@@ -39,7 +39,7 @@
   }
   function refresh(){
     if(owner!==app.personal.account()){owner=app.personal.account();$('#goalMonth').value=model.monthOf(new Date());$('#goalAmount').value='';$('#goalMessage').textContent='';$('#historySearch').value='';$('#historyMonth').value='';$('#historyRating').value='all';limit=50;}
-    const progress=app.getProgress(),all=rows(),rated=all.filter(r=>r.rating),month=model.monthOf(new Date()),monthly=all.filter(r=>model.monthOf(r.date)===month);
+    const progress=app.getReadingProgress(),all=rows(),rated=all.filter(r=>r.rating),month=model.monthOf(new Date()),monthly=all.filter(r=>model.monthOf(r.date)===month);
     $('#readingStorage').textContent=owner?'Diário privado, sincronizado com sua conta.':'Diário salvo neste navegador. Entre na conta para sincronizar entre dispositivos.';
     goalRefresh(all);
     $('#readingMetrics').innerHTML=[[all.length,'leituras registradas'],[monthly.length,'leituras neste mês'],[rated.length?(rated.reduce((sum,r)=>sum+r.rating,0)/rated.length).toFixed(1)+' / 5':'—','média das avaliações']].map(([number,label])=>`<div><strong>${escape(number)}</strong><span>${label}</span></div>`).join('');
@@ -62,9 +62,9 @@
   $('#historyClear').onclick=()=>{for(const id of ['historySearch','historyMonth'])$('#'+id).value='';$('#historyRating').value='all';limit=50;refresh();};
   $('#historyMore').onclick=()=>{limit+=50;refresh();};
   $('#historyRows').onclick=event=>{const target=event.target.closest('button');if(target?.dataset.session)window.PilhaExtras.session(null,target.dataset.session);if(target?.dataset.reread)window.PilhaExtras.session(target.dataset.reread);if(target?.dataset.entry)app.reading.openNote(target.dataset.entry);if(target?.dataset.order)app.openOrder(target.dataset.order);};
-  $('#trashRows').onclick=async event=>{const target=event.target.closest('button'),id=target?.dataset.restore||target?.dataset.purge;if(!id)return;const base=app.getProgress().trash[id],removingOwner=app.personal.account();try{if(target.dataset.restore){app.reading.restore(id,base);app.toast('Lista restaurada com seu progresso.');}else if(await confirmAction('Excluir esta lista e seu progresso definitivamente? Só será possível recuperar com um backup JSON anterior.','Excluir definitivamente')){if(removingOwner!==app.personal.account())throw Error('A conta mudou. Abra a lixeira novamente.');app.reading.purge(id,base);app.toast('Lista excluída definitivamente.');}}catch(error){app.toast(error.message);}refresh();};
+  $('#trashRows').onclick=async event=>{const target=event.target.closest('button'),id=target?.dataset.restore||target?.dataset.purge;if(!id)return;const base=app.getReadingProgress().trash[id],removingOwner=app.personal.account();try{if(target.dataset.restore){app.reading.restore(id,base);app.toast('Lista restaurada com seu progresso.');}else if(await confirmAction('Excluir esta lista e seu progresso definitivamente? Só será possível recuperar com um backup JSON anterior.','Excluir definitivamente')){if(removingOwner!==app.personal.account())throw Error('A conta mudou. Abra a lixeira novamente.');app.reading.purge(id,base);app.toast('Lista excluída definitivamente.');}}catch(error){app.toast(error.message);}refresh();};
   $('#readingCsv').onclick=()=>{const url=URL.createObjectURL(new Blob([model.csv(filtered)],{type:'text/csv;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=`minha-pilha-historico-${today()}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);app.toast('Histórico exportado com os filtros atuais.');};
-  window.PilhaReadingUI={refresh,confirm:confirmAction,openEntry(key){rereadButton.dataset.key=key;rereadButton.hidden=!!app.reading.entries().find(e=>e.key===key)?.hasCompanions;const p=app.getProgress();entryOwner=app.personal.account();originalDate=p.completedAt[key]||'';$('#entryRating').value=p.ratings[key]||0;$('#entryDate').disabled=!p.read[key];$('#entryDate').value=dateInput(originalDate);$('#entryDate').max=today();$('#entryMessage').textContent='';},saveEntry(key,state){
+  window.PilhaReadingUI={refresh,confirm:confirmAction,openEntry(key){rereadButton.dataset.key=key;rereadButton.hidden=!!app.reading.entries().find(e=>e.key===key)?.hasCompanions;const p=app.getReadingProgress();entryOwner=app.personal.account();originalDate=p.completedAt[key]||'';$('#entryRating').value=p.ratings[key]||0;$('#entryDate').disabled=!p.read[key];$('#entryDate').value=dateInput(originalDate);$('#entryDate').max=today();$('#entryMessage').textContent='';},saveEntry(key,state){
     if(entryOwner!==app.personal.account()){$('#entryMessage').textContent='A conta mudou. Abra a leitura novamente.';return false;}
     const rating=Number($('#entryRating').value),date=$('#entryDate').value;
     if(rating!==0&&(!Number.isInteger(rating)||rating<1||rating>5))return false;

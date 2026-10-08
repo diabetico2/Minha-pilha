@@ -11,12 +11,12 @@ let passed = 0;
 function test(name, run) { run(); passed++; console.log(`PASS ${name}`); }
 function bridge() {
   const builtInOrders=[{id:'batman', title:'Batman', sections:[{key:4, title:'Fase', items:[{title:'Batman #1'}]}]}];
-  const c={window:{PilhaReadingModel:require('../assets/js/reading-model.js'),PilhaPersonal:model,PilhaProfileModel:require('../assets/js/profile-model.js')}, builtInOrders, orders:builtInOrders, accountId:null,accountMemory:new Map(),selected:'batman',applyingRemote:false,
+  const c={window:{PilhaIssues:require('../assets/js/issue-model.js'),PilhaReadingModel:require('../assets/js/reading-model.js'),PilhaPersonal:model,PilhaProfileModel:require('../assets/js/profile-model.js')}, builtInOrders, orders:builtInOrders, accountId:null,accountMemory:new Map(),selected:'batman',applyingRemote:false,
     $:()=>({open:false,value:''}),load:()=>c.blankState(),showView(){},render(){},save(){},toast(){},localStorage:{getItem:()=>null},
     keyFor:(order,section,item)=>`${order}:${section}:${item}`,selectOrder:id=>{c.selected=id}};
   vm.createContext(c);
   vm.runInContext(source.slice(source.indexOf('  function refreshOrders('),source.indexOf('  function ensureCompletionDates(')),c);
-  c.state=c.blankState();
+  c.state=c.blankState();c.refreshOrders();
   vm.runInContext(source.slice(source.indexOf('  function counts('),source.indexOf('  function activeOrders(')),c);
   const start=source.indexOf('  window.PilhaApp =');vm.runInContext(source.slice(start,source.indexOf('\n  render();',start)),c);
   return c;

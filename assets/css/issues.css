@@ -1,0 +1,20 @@
+.issue-intro{color:#aeb4be;font-size:12px;line-height:1.7;margin:0 0 18px;max-width:850px}
+.issue-tree{margin:0 20px 16px 51px;padding:0;border:1px solid #333940;border-radius:7px;overflow:hidden;background:#131619}
+.issue-tree>summary{cursor:pointer;padding:11px 14px;color:#e4d19b;font-size:12px;line-height:1.6}
+.issue-tree>summary>span{margin-left:9px;color:#a9b4c0}
+.issue-tree>p{padding:0 14px;color:#a9b4c0;font-size:12px;line-height:1.6}
+.issue-series{margin:0 14px 12px;border-left:2px solid #40434a;padding-left:14px}
+.issue-series>summary{cursor:pointer;font-size:13px;line-height:1.6;padding:9px 0;color:#e7e8eb;overflow-wrap:anywhere}
+.issue-series small{display:block;margin-left:15px;font-size:11px;color:#929dad}
+.issue-leaf{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:7px 8px;border-top:1px solid #242a30}
+.issue-leaf label{display:flex;align-items:center;gap:12px;cursor:pointer;font-size:13px;min-height:32px}
+.issue-check{width:18px;height:18px;accent-color:var(--red,#e2c16b);cursor:pointer;flex-shrink:0}
+.issue-matches{font-size:11px;line-height:1.5;padding:6px 9px;max-width:65%;text-align:right}
+.issue-partial{display:inline-block;color:#e4d19b;font-size:11px;margin:5px 0}
+.issue-dialog{width:min(680px,calc(100vw - 32px));max-height:85dvh;overflow:auto}
+.issue-dialog p{font-size:13px;line-height:1.7;color:#afb7c5}
+.issue-dialog article{display:flex;justify-content:space-between;gap:20px;align-items:center;padding:16px 0;border-bottom:1px solid #353c47}
+.issue-dialog h3{font-size:15px;margin:6px 0;overflow-wrap:anywhere}.issue-dialog small{font-size:11px;color:#b6a37a}
+.issue-dialog button{flex-shrink:0}.issue-dialog .dialog-secondary{padding:10px;border-radius:6px}
+.issue-tree summary:focus-visible,.issue-tree button:focus-visible,.issue-tree input:focus-visible{outline:2px solid #e2c16b;outline-offset:3px}
+@media(max-width:650px){.issue-tree{margin:0 10px 14px 25px}.issue-series{margin-left:10px;padding-left:9px}.issue-leaf{gap:6px}.issue-matches{max-width:58%}.issue-dialog article{align-items:start;flex-direction:column;gap:8px}}

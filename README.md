@@ -2,6 +2,8 @@
 
 Biblioteca pessoal de quadrinhos e mangás, com ordens de leitura, diário com releituras, tags pessoais, busca global, compartilhamento por link, metas mensais, avaliações, anotações, listas próprias, lixeira e perfil sincronizado.
 
+Agora as histórias com numeração identificada podem ser abertas por série e edição. O progresso das mesmas edições se propaga entre listas da própria conta, com indicação de leitura parcial. Veja [edições, correspondências e backups](docs/EDICOES.md).
+
 **[Abrir o site](https://diabetico2.github.io/Minha-pilha/)** · [Guia de uso](docs/GUIA.md) · [Firebase e sincronização](docs/FIREBASE.md) · [Roteiro de apresentação de DB2](docs/DB2.md)
 
 ## Organização
@@ -52,6 +54,7 @@ Mover arquivos do site não muda as chaves do armazenamento local nem o endereç
 
 ## Versões preservadas
 
+- Antes das edições individuais e marcações cruzadas: tag `backup/pre-edicoes-cruzadas-14f7b63`.
 - Antes de releituras, tags e links públicos: tag `backup/pre-releituras-links-c3a4329`.
 - Antes dos perfis: tag `backup/pre-perfis-80da19a`.
 - Antes do diário, metas e lixeira: tag `backup/pre-diario-metas-56804cd` e ZIP `minha-pilha-antes-diario-metas-56804cd.zip`.

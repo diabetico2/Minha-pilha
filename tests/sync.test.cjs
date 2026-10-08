@@ -35,7 +35,7 @@ async function client(server, storage = new Map(), passwordAPI = {}) {
     return elements.get(id);
   };
   const source = fs.readFileSync(path.join(__dirname,'../assets/js/app.js'), 'utf8');
-  const validators = { window: { PilhaReadingModel: require('../assets/js/reading-model.js'), PilhaPersonal: personal, PilhaProfileModel: profileModel } };
+  const validators = { window: { PilhaIssues:require('../assets/js/issue-model.js'),PilhaReadingModel: require('../assets/js/reading-model.js'), PilhaPersonal: personal, PilhaProfileModel: profileModel } };
   vm.createContext(validators);
   vm.runInContext(source.slice(source.indexOf('  function validateProgress('), source.indexOf('  function ensureCompletionDates(')), validators);
   const app = {
@@ -93,8 +93,8 @@ async function client(server, storage = new Map(), passwordAPI = {}) {
   await test('production app bridge preserves guest memory and switches account caches',()=>{
     const source=fs.readFileSync(path.join(__dirname,'../assets/js/app.js'),'utf8');
     const initial=empty();initial.read.guest=true;
-    const bridgeContext={window:{PilhaReadingModel:require('../assets/js/reading-model.js'),PilhaPersonal:personal,PilhaProfileModel:profileModel},state:initial,accountId:null,accountMemory:new Map(),orders:[{id:'batman'}],selected:'batman',KEY:'minha-pilha-v1',AUTO_BACKUP_KEY:'minha-pilha-v1-auto-backup',applyingRemote:false,
-      $:()=>({open:false,value:''}),load:()=>empty(),showView(){},selectOrder(){},refreshOrders(){},render(){},save(){},toast(){},localStorage:{getItem:()=>null}};
+    const bridgeContext={window:{PilhaIssues:require('../assets/js/issue-model.js'),PilhaReadingModel:require('../assets/js/reading-model.js'),PilhaPersonal:personal,PilhaProfileModel:profileModel},state:initial,accountId:null,accountMemory:new Map(),orders:[{id:'batman'}],selected:'batman',KEY:'minha-pilha-v1',AUTO_BACKUP_KEY:'minha-pilha-v1-auto-backup',applyingRemote:false,
+      $:()=>({open:false,value:''}),load:()=>empty(),showView(){},selectOrder(){},refreshOrders(){},markRead(){},render(){},save(){},toast(){},localStorage:{getItem:()=>null}};
     vm.createContext(bridgeContext);
     vm.runInContext(source.slice(source.indexOf('  function validateProgress('), source.indexOf('  function ensureCompletionDates(')),bridgeContext);
     const start=source.indexOf('  window.PilhaApp =');
@@ -138,6 +138,18 @@ async function client(server, storage = new Map(), passwordAPI = {}) {
     await a.flush();assert.equal(server.writes.length,0);a.close();
     const b=await client(server,storage);b.login('alice');assert.equal(b.app.getProgress().read.offline,true);await b.flush();
     assert.equal(model.fromRemote(server.data.get('alice')).read.offline,true);assert.equal(storage.size,0);
+  });
+  await test('issue marks merge across devices, survive offline reload and keep unmarked legacy collections partial',async()=>{
+    const server=fakeServer(),storage=new Map(),a=await client(server,storage),b=await client(server),outsider=await client(server);
+    a.login('alice');b.login('alice');outsider.login('bob');
+    const first='issue:dc:batman-confidential:y2007:26',second='issue:dc:batman-confidential:y2007:27',yes=JSON.stringify({read:true,date:'2026-10-08T12:00:00Z'}),no=JSON.stringify({read:false,date:''});
+    a.edit('issueRead',first,yes);b.edit('issueRead',second,yes);await a.flush();await b.flush();
+    assert.deepEqual(b.app.getProgress().issueRead,{[first]:yes,[second]:yes});assert.deepEqual(outsider.app.getProgress().issueRead,{});
+    a.connect(false);a.edit('issueRead',first,no);await a.flush();a.close();
+    const restored=await client(server,storage);restored.login('alice');await restored.flush();assert.equal(b.app.getProgress().issueRead[first],no);
+    const issues=require('../assets/js/issue-model.js'),index=issues.build([{id:'batman',publisher:'DC',sections:[{items:[{title:'Batman Confidential (2007) #26-28'}]}]}]);
+    const stale=b.app.getProgress();stale.read['batman:0:0']=true;assert.equal(issues.view(index,stale).status.get('batman:0:0').done,2);assert.equal(issues.view(index,stale).read['batman:0:0'],undefined);
+    restored.login('bob');assert.deepEqual(restored.app.getProgress().issueRead,{});
   });
   await test('new changes during an in-flight write remain pending',async()=>{
     const server=fakeServer(),a=await client(server);a.login('alice');let release;const pending=new Promise(resolve=>release=resolve);a.holdWrites(pending);

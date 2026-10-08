@@ -31,6 +31,10 @@
     if (!plain(raw) || typeof raw.deletedAt !== 'string' || !Number.isFinite(Date.parse(raw.deletedAt))) throw Error('Data de exclusão inválida.');
     const list = personal.parse(raw.list, id), validKeys = new Set(list.items.map(item => `${id}:personal:${item.id}`));
     const result = {list:raw.list,deletedAt:raw.deletedAt};
+    result.issueRead=raw.issueRead||{};
+    const issueModel=typeof module!=='undefined'&&module.exports?require('./issue-model.js'):root.PilhaIssues;
+    issueModel.validate(result.issueRead);
+    if(Object.keys(result.issueRead).some(key=>!key.startsWith(`local:${id}:`)))throw Error('A lixeira contém edições de outra lista.');
     result.tags=validateMap(raw.tags||{},'tags');
     if(Object.keys(result.tags).some(key=>key!==id)) throw Error('A lixeira contém tags de outra lista.');
     result.sessions=validateMap(raw.sessions||{},'sessions');

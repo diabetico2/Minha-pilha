@@ -8,6 +8,7 @@ Extraia o ZIP e abra **index.html**. Mantenha os arquivos juntos na mesma pasta.
 
 ## O que mudou
 
+- **Edições desta história** separa séries e números identificados; marcar ou desmarcar uma edição atualiza as ocorrências equivalentes em outras listas da sua conta. [Como funciona e cuidados com saves](EDICOES.md).
 - Página **Início** com capas dos personagens e histórias, busca, filtros e acesso à leitura em andamento.
 - **Meu perfil** com nome, foto, apresentação e estatísticas de leitura, sincronizados na própria conta.
 - Troca de senha dentro do perfil: confirme a senha atual e digite a nova duas vezes. A sessão deste dispositivo permanece aberta.

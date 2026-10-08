@@ -6,6 +6,7 @@
   };
   const builtInOrders = [...(window.COMIC_ORDERS || []), ...(window.EXPANDED_ORDERS || [])].map(classify);
   let orders = builtInOrders;
+  let issueIndex = null, issueView = null;
   let KEY = 'minha-pilha-v1';
   let AUTO_BACKUP_KEY = 'minha-pilha-v1-auto-backup';
   let accountId = null;
@@ -33,8 +34,35 @@
 
   function refreshOrders() {
     orders = [...builtInOrders, ...Object.entries(state.customOrders).map(([id, value]) => window.PilhaPersonal.toOrder(window.PilhaPersonal.parse(value, id)))];
+    issueIndex=window.PilhaIssues.build(orders);refreshIssueView();
   }
 
+  function refreshIssueView(){issueView=window.PilhaIssues.view(issueIndex,state);}
+  function isRead(key){return !!issueView.read[key];}
+  function protectIssueBackup(){
+    const key=KEY+'-before-issues-v1';
+    if(localStorage.getItem(key))return;
+    try{localStorage.setItem(key,JSON.stringify({version:8,schema:'minha-pilha-progress',exportedAt:new Date().toISOString(),app:'Minha Pilha',progress:blankState(state)}));}
+    catch{throw Error('Não foi possível guardar o backup anterior. Baixe seu backup e libere espaço no navegador antes de marcar edições.');}
+  }
+  function markRead(keys,checked){
+    protectIssueBackup();
+    const result=window.PilhaIssues.mark(issueIndex,state,keys,checked,new Date().toISOString());
+    save();renderNav();renderOrder();
+    const others=new Set(result.crossed.map(key=>issueIndex.rows.get(key)?.orderId).filter(id=>id&&id!==selected));
+    if(others.size)toast(`Edição ${checked?'marcada':'desmarcada'} também em ${others.size} outra(s) lista(s).`);
+    return result;
+  }
+  function issueTree(key){
+    const row=issueIndex.rows.get(key);if(!row)return '';
+    const status=issueView.status.get(key);
+    if(!row.issues.length)return `<details class="issue-tree issue-unknown"><summary>Conteúdo da história</summary><p>A fonte não informa a numeração das edições. Use a marcação da história completa; nenhum vínculo automático foi presumido.</p></details>`;
+    const groups=row.groups.map(group=>`<details class="issue-series" open><summary>${escapeHtml(group.label)} <small>${group.linked?(group.version.startsWith('y')?group.version.slice(1):'vol. '+group.version.slice(1)):'referência sem vínculo confirmado · marcação local'}</small></summary><div class="issue-leaves">${group.issues.map(issue=>{
+      const checked=!!issueView.marks.get(issue.id)?.read,occurrences=issueIndex.byIssue.get(issue.id)||[],other=occurrences.filter(k=>k!==key);
+      return `<div class="issue-leaf"><label><input type="checkbox" class="issue-check" data-issue="${escapeHtml(issue.id)}" ${checked?'checked':''} aria-label="Marcar ${escapeHtml(issue.title)} como lido"><span>#${escapeHtml(issue.number)}</span></label>${other.length?`<button class="text-button issue-matches" data-issue="${escapeHtml(issue.id)}">Em ${other.length} outro(s) item(ns)</button>`:''}</div>`;
+    }).join('')}</div></details>`).join('');
+    return `<details class="issue-tree" data-issue-row="${escapeHtml(key)}" ${expandedGroups.has('issues:'+key)?'open':''}><summary>Edições desta história <span>${status.done}/${status.total} lidas</span>${status.partial?' · em andamento':''}</summary>${!row.complete?'<p class="issue-help">A fonte também menciona conteúdo sem numeração. Depois das edições, confirme a leitura completa na caixa da história.</p>':''}${groups}</details>`;
+  }
   function validateProgress(raw) {
     const plain = value => value && typeof value === 'object' && !Array.isArray(value);
     if (!plain(raw) || !plain(raw.read)) throw new Error('Formato inválido');
@@ -52,6 +80,7 @@
     if (raw.customOrders !== undefined) window.PilhaPersonal.validateMap(raw.customOrders);
     if (raw.profile !== undefined) window.PilhaProfileModel.validate(raw.profile);
     for (const field of ['ratings','goals','tags','sessions']) if (raw[field] !== undefined) window.PilhaReadingModel.validateMap(raw[field],field);
+    if (raw.issueRead !== undefined) window.PilhaIssues.validate(raw.issueRead);
     if (raw.trash !== undefined) window.PilhaReadingModel.validateTrash(raw.trash,window.PilhaPersonal);
     return blankState(raw);
   }
@@ -70,6 +99,7 @@
       trash: raw.trash || {},
       tags: raw.tags || {},
       sessions: raw.sessions || {},
+      issueRead: raw.issueRead || {},
       lastSelectedOrder: typeof raw.lastSelectedOrder === 'string' ? raw.lastSelectedOrder : null,
       savedAt: raw.savedAt || null,
       lastBackupAt: raw.lastBackupAt || null
@@ -103,6 +133,7 @@
   }
 
   function save() {
+    refreshIssueView();
     state.savedAt = new Date().toISOString();
     if (!applyingRemote) window.PilhaCloud?.changed(state);
     const serialized = JSON.stringify(state);
@@ -131,9 +162,9 @@
     order.sections.forEach((section, sectionIndex) => section.items.forEach((item, itemIndex) => {
       const sectionKey = section.key ?? sectionIndex;
       const keys = [keyFor(order.id, sectionKey, order.personal ? item.key : itemIndex), ...(item.companions || []).map((_, companionIndex) => keyFor(order.id, sectionKey, order.personal ? item.key : itemIndex, companionIndex))];
-      keys.forEach(key => { total++; if (state.read[key]) read++; });
+      keys.forEach(key => { total++; if (isRead(key)) read++; });
     }));
-    return { total, read, pct: total ? Math.round(read / total * 100) : 0 };
+    return { total, read, partial:(issueIndex.byOrder.get(order.id)||[]).filter(row=>issueView.status.get(row.key)?.partial).length, pct: total ? Math.round(read / total * 100) : 0 };
   }
 
   function entriesFor(order) {
@@ -167,7 +198,7 @@
   function activeOrders() {
     return orders.filter(order => {
       const progress = counts(order);
-      return progress.read < progress.total && (progress.read > 0 || Boolean(state.current[order.id]));
+      return progress.read < progress.total && (progress.read > 0 || progress.partial > 0 || Boolean(state.current[order.id]));
     });
   }
   function uniqueOrders(list) { const seen = new Set(); return list.filter(order => order && !seen.has(order.id) && seen.add(order.id)); }
@@ -308,7 +339,7 @@
     render();
     document.querySelector('.library').scrollIntoView({ behavior: 'smooth' });
   }
-  function render() { renderNav(); renderOrder(); updateStats(); renderFeatured(); updateSaveStatus(); window.PilhaHome?.refresh(); window.PilhaProfileUI?.refresh(); window.PilhaReadingUI?.refresh(); }
+  function render() { refreshIssueView(); renderNav(); renderOrder(); updateStats(); renderFeatured(); updateSaveStatus(); window.PilhaHome?.refresh(); window.PilhaProfileUI?.refresh(); window.PilhaReadingUI?.refresh(); }
 
   function updateCollectionButtons(order) {
     const favorite = Boolean(state.favoriteOrders[order.id]);
@@ -343,7 +374,7 @@
     if (era !== 'all' && !eraOptions.some(option => option.value === era)) era = 'all';
     eraSelect.innerHTML = `<option value="all">Todas as fases</option>${eraOptions.map(option => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`).join('')}`;
     eraSelect.value = era;
-    const unread = readableEntriesFor(order).filter(entry => !state.read[entry.key]);
+    const unread = readableEntriesFor(order).filter(entry => !isRead(entry.key));
     const nextButton = $('#nextUnreadBtn');
     nextButton.disabled = !unread.length;
     const target = nextEntry(order);
@@ -362,19 +393,20 @@
         const allText = [item.title, item.details, ...(item.companions || []).flatMap(companion => [companion.title, companion.details])].join(' ');
         if (!normalize(allText).includes(query)) return '';
         const groupKeys = [mainKey, ...(item.companions || []).map((_, companionIndex) => keyFor(order.id, sectionKey, order.personal ? item.key : itemIndex, companionIndex))];
-        const groupRead = groupKeys.filter(key => state.read[key]).length;
+        const groupRead = groupKeys.filter(key => isRead(key)).length;
         const groupComplete = groupRead === groupKeys.length;
         const groupProgress = Math.round(groupRead / groupKeys.length * 100);
         const groupAction = groupKeys.length > 1 ? `<button class="group-toggle ${groupComplete ? 'is-complete' : ''}" type="button" data-group-keys="${escapeHtml(groupKeys.join('|'))}" aria-label="${groupComplete ? 'Desmarcar' : 'Marcar'} todo o arco">${groupComplete ? '↺ Desmarcar tudo' : '✓ Marcar tudo'}<small>${groupRead}/${groupKeys.length}</small></button>` : '';
         const makeRow = (entry, key, companion = false, arcAction = '') => {
-          const read = Boolean(state.read[key]);
+          const read = isRead(key);
+          const partial=issueView.status.get(key)?.partial;
           const current = state.current[order.id] === key;
           const show = filter === 'all' || (filter === 'read' && read) || (filter === 'unread' && !read);
           if (!show) return '';
           visible++;
           const note = state.notes[key]?.trim();
-          const date = state.completedAt[key];
-          return `<div class="comic-row ${companion ? 'companion-row' : ''} ${read ? 'is-read' : ''} ${current ? 'is-current' : ''}" data-key="${escapeHtml(key)}"><input class="check" type="checkbox" ${read ? 'checked' : ''} aria-label="Marcar ${escapeHtml(entry.title)} como lido"><span class="comic-copy"><strong class="comic-title">${escapeHtml(entry.title)}</strong>${entry.details ? `<span class="comic-details">${escapeHtml(entry.details)}</span>` : ''}<span class="reading-metadata">${read && date ? `<span class="read-date">✓ Lido em ${formatDate(date)}</span>` : ''}${state.ratings[key] ? `<span class="read-rating">${'★'.repeat(state.ratings[key])}</span>` : ''}${note ? '<span class="note-saved">● Nota salva</span>' : ''}</span></span><span class="row-actions">${arcAction}<button class="note-btn ${note ? 'has-note' : ''}" type="button">${note || state.ratings[key] ? '✎ Avaliar / nota' : '☆ Avaliar / nota'}</button><button class="current-btn" type="button" title="${current ? 'Onde parei' : 'Marcar onde parei'}" aria-label="${current ? 'Onde parei' : 'Marcar onde parei'}: ${escapeHtml(entry.title)}">${current ? '★ Onde parei' : '☆ Marcar onde parei'}</button></span></div>`;
+          const date = issueView.completedAt[key];
+          return `<div class="comic-row ${companion ? 'companion-row' : ''} ${read ? 'is-read' : ''} ${current ? 'is-current' : ''}" data-key="${escapeHtml(key)}"><input class="check" type="checkbox" ${read ? 'checked' : ''} aria-label="Marcar ${escapeHtml(entry.title)} como lido"><span class="comic-copy"><strong class="comic-title">${escapeHtml(entry.title)}</strong>${partial?'<span class="issue-partial">Leitura parcial</span>':''}${entry.details ? `<span class="comic-details">${escapeHtml(entry.details)}</span>` : ''}<span class="reading-metadata">${read && date ? `<span class="read-date">✓ Lido em ${formatDate(date)}</span>` : ''}${state.ratings[key] ? `<span class="read-rating">${'★'.repeat(state.ratings[key])}</span>` : ''}${note ? '<span class="note-saved">● Nota salva</span>' : ''}</span></span><span class="row-actions">${arcAction}<button class="note-btn ${note ? 'has-note' : ''}" type="button">${note || state.ratings[key] ? '✎ Avaliar / nota' : '☆ Avaliar / nota'}</button><button class="current-btn" type="button" title="${current ? 'Onde parei' : 'Marcar onde parei'}" aria-label="${current ? 'Onde parei' : 'Marcar onde parei'}: ${escapeHtml(entry.title)}">${current ? '★ Onde parei' : '☆ Marcar onde parei'}</button></span></div>${issueTree(key)}`;
         };
         const main = makeRow(item, mainKey, false, groupAction);
         const companions = (item.companions || []).map((companion, companionIndex) => makeRow(companion, keyFor(order.id, sectionKey, order.personal ? item.key : itemIndex, companionIndex), true)).join('');
@@ -389,56 +421,17 @@
     document.querySelectorAll('.group-details').forEach(detail => detail.ontoggle = () => {
       if (detail.open) expandedGroups.add(detail.dataset.detail); else expandedGroups.delete(detail.dataset.detail);
     });
+    document.querySelectorAll('[data-issue-row]').forEach(detail=>detail.ontoggle=()=>{const key='issues:'+detail.dataset.issueRow;if(detail.open)expandedGroups.add(key);else expandedGroups.delete(key);});
+    document.querySelectorAll('.issue-check').forEach(check=>check.onchange=()=>{try{markRead([check.dataset.issue],check.checked);}catch(error){toast(error.message);renderOrder();}});
+    document.querySelectorAll('.issue-matches').forEach(button=>button.onclick=()=>window.PilhaIssueUI?.matches(button.dataset.issue));
     document.querySelectorAll('.comic-row').forEach(row => {
       const check = row.querySelector('.check');
       const currentButton = row.querySelector('.current-btn');
       const noteButton = row.querySelector('.note-btn');
       const groupToggle = row.querySelector('.group-toggle');
-      check.onchange = () => {
-        const affected = [row.dataset.key];
-        const completedNow = new Date().toISOString();
-        affected.forEach(key => {
-          if (check.checked) { state.read[key] = true; if (!state.completedAt[key]) state.completedAt[key] = completedNow; }
-          else { delete state.read[key]; delete state.completedAt[key]; }
-        });
-        let parentAutoMarked = false;
-        let parentPreserved = false;
-        if (row.classList.contains('companion-row')) {
-          const group = row.closest('.reading-group');
-          const parentKey = group?.dataset.parentKey;
-          const childKeys = (group?.dataset.keys || '').split('|').slice(1);
-          if (parentKey && childKeys.length) {
-            const wasMarked = Boolean(state.read[parentKey]);
-            const allMarked = childKeys.every(key => Boolean(state.read[key]));
-            if (allMarked) { state.read[parentKey] = true; if (!state.completedAt[parentKey]) state.completedAt[parentKey] = completedNow; parentAutoMarked = !wasMarked; }
-            else if (wasMarked) parentPreserved = true;
-          }
-        }
-
-        save();
-        renderNav();
-        renderOrder();
-        if (parentAutoMarked) toast('Obra principal marcada automaticamente');
-        else if (parentPreserved) toast('Subitem desmarcado; obra principal mantida');
-      };
-      if (groupToggle) groupToggle.onclick = () => {
-        const keys = groupToggle.dataset.groupKeys.split('|').filter(Boolean);
-        const markAll = !keys.every(key => state.read[key]);
-        const completedNow = new Date().toISOString();
-        keys.forEach(key => {
-          if (markAll) {
-            state.read[key] = true;
-            if (!state.completedAt[key]) state.completedAt[key] = completedNow;
-          } else {
-            delete state.read[key];
-            delete state.completedAt[key];
-          }
-        });
-        save();
-        renderNav();
-        renderOrder();
-        toast(markAll ? 'Arco inteiro marcado como lido' : 'Arco inteiro desmarcado');
-      };
+      check.indeterminate=!!issueView.status.get(row.dataset.key)?.partial;
+      check.onchange=()=>{try{markRead([row.dataset.key],check.checked);}catch(error){toast(error.message);renderOrder();}};
+      if(groupToggle)groupToggle.onclick=()=>{const keys=groupToggle.dataset.groupKeys.split('|').filter(Boolean);try{markRead(keys,!keys.every(isRead));}catch(error){toast(error.message);}};
       currentButton.setAttribute('aria-pressed', String(state.current[order.id] === row.dataset.key));
       if (state.current[order.id] === row.dataset.key) {
         currentButton.textContent = '★ Remover marcador';
@@ -477,7 +470,7 @@
     const order = orders.find(item => item.id === selected);
     if (!order) return;
     const entries = readableEntriesFor(order);
-    const unread = entries.filter(entry => !state.read[entry.key]);
+    const unread = entries.filter(entry => !isRead(entry.key));
     if (!unread.length) { toast('Esta ordem já está concluída'); return; }
     const target = nextEntry(order);
     query = ''; era = 'all'; filter = 'all'; $('#searchInput').value = '';
@@ -497,9 +490,11 @@
   function exportProgress() {
     const exportedAt = new Date().toISOString();
     state.lastBackupAt = exportedAt;
+    const effective=issueView;
+    for(const row of issueIndex.rows.values())if(row.issues.length){if(effective.read[row.key]){state.read[row.key]=true;if(effective.completedAt[row.key])state.completedAt[row.key]=effective.completedAt[row.key];}else delete state.read[row.key];}
     ensureCompletionDates(state, exportedAt);
     save();
-    const payload = JSON.stringify({ version: 7, schema: 'minha-pilha-progress', exportedAt, app: 'Minha Pilha', progress: blankState(state) }, null, 2);
+    const payload = JSON.stringify({ version: 8, schema: 'minha-pilha-progress', exportedAt, app: 'Minha Pilha', progress: blankState(state) }, null, 2);
     const blob = new Blob([payload], { type: 'application/json' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -529,6 +524,7 @@
   $('#reminderBackupBtn').onclick = exportProgress;
   $('#saveNoteBtn').onclick = () => {
     if (!activeNoteKey) return;
+    if(isRead(activeNoteKey))state.read[activeNoteKey]=true;else delete state.read[activeNoteKey];
     if (window.PilhaReadingUI && !window.PilhaReadingUI.saveEntry(activeNoteKey, state)) return;
     const value = $('#noteText').value.trim();
     if (value) state.notes[activeNoteKey] = value; else delete state.notes[activeNoteKey];
@@ -554,6 +550,7 @@
       Object.assign(state, imported);
       window.PilhaPersonalUI?.close();
       window.PilhaExtras?.closePrivate();
+      window.PilhaIssueUI?.close();
       refreshOrders();
       selected = orders.some(order => order.id === state.lastSelectedOrder) ? state.lastSelectedOrder : orders[0]?.id;
       query = ''; era = 'all'; filter = 'all'; $('#searchInput').value = '';
@@ -584,9 +581,9 @@
 
   function nextEntry(order) {
     const entries = readableEntriesFor(order);
-    const unread = entries.filter(entry => !state.read[entry.key]);
+    const unread = entries.filter(entry => !isRead(entry.key));
     const index = entries.findIndex(entry => entry.key === state.current[order.id]);
-    return index >= 0 && !state.read[entries[index].key] ? entries[index] : entries.slice(index + 1).find(entry => !state.read[entry.key]) || unread[0];
+    return index >= 0 && !isRead(entries[index].key) ? entries[index] : entries.slice(index + 1).find(entry => !isRead(entry.key)) || unread[0];
   }
   function showView(view, scroll = true) {
     const shelf = view === 'shelf';
@@ -636,6 +633,13 @@
   });
   window.PilhaApp = {
     getProgress: () => JSON.parse(JSON.stringify(state)),
+    getReadingProgress: () => ({...JSON.parse(JSON.stringify(state)),read:{...issueView.read},completedAt:{...issueView.completedAt}}),
+    issues: {
+      mark:markRead,
+      status:key=>({...issueView.status.get(key)}),
+      matches:id=>(issueIndex.byIssue.get(id)||[]).map(key=>{const row=issueIndex.rows.get(key);return {key,title:row.title,orderTitle:row.orderTitle,orderId:row.orderId};}),
+      backup(){const value=localStorage.getItem(KEY+'-before-issues-v1');if(!value){toast('O backup será criado antes da sua primeira marcação nesta versão.');return;}const url=URL.createObjectURL(new Blob([value],{type:'application/json'})),a=document.createElement('a');a.href=url;a.download='minha-pilha-antes-das-edicoes.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+    },
     validate: validateProgress,
     empty: blankState,
     catalogue: () => orders.map(order => ({ id: order.id, title: order.title, publisher: order.publisher, family: order.family, description: order.description || '', personal: !!order.personal, cover: order.cover || '', progress: counts(order) })),
@@ -685,7 +689,7 @@
         if (Object.keys(state.customOrders).length >= window.PilhaPersonal.MAX_LISTS) throw Error('Sua biblioteca já tem 100 listas pessoais.');
         const record=window.PilhaReadingModel.parseTrash(base,id,window.PilhaPersonal);
         state.customOrders[id]=record.list;
-        for (const field of ['read','notes','completedAt','ratings','current','favoriteOrders','queueOrders','tags','sessions']) Object.assign(state[field],record[field]);
+        for (const field of ['read','notes','completedAt','ratings','current','favoriteOrders','queueOrders','tags','sessions','issueRead']) Object.assign(state[field],record[field]);
         delete state.trash[id]; refreshOrders(); selectOrder(id);
       },
       purge(id, base) {
@@ -709,6 +713,7 @@
             if (key.startsWith(`${list.id}:`) && !keep.has(key)) delete state[field][key];
           }
           for(const [id,value] of Object.entries(state.sessions)){const key=window.PilhaReadingModel.parseSession(value).key;if(key.startsWith(`${list.id}:`)&&!keep.has(key))delete state.sessions[id];}
+          for(const row of issueIndex.byOrder.get(list.id)||[])if(!keep.has(row.key))for(const issue of row.issues)if(issue.id.startsWith('local:'))delete state.issueRead[issue.id];
           if (state.current[list.id] && !keep.has(state.current[list.id])) delete state.current[list.id];
         }
         state.customOrders[list.id] = value;
@@ -720,12 +725,14 @@
         if (Object.keys(state.trash).length >= 20 && !state.trash[id]) throw Error('Sua lixeira tem 20 listas. Restaure ou exclua uma delas antes de continuar.');
         const record={list:base,deletedAt:new Date().toISOString()};
         for (const field of ['read','notes','completedAt','ratings','current','favoriteOrders','queueOrders']) record[field]=Object.fromEntries(Object.entries(state[field]).filter(([key])=>key===id||key.startsWith(`${id}:`)));
+        record.issueRead=Object.fromEntries(Object.entries(state.issueRead).filter(([key])=>key.startsWith(`local:${id}:`)));
         record.tags=state.tags[id]?{[id]:state.tags[id]}:{};
         record.sessions=Object.fromEntries(Object.entries(state.sessions).filter(([,value])=>window.PilhaReadingModel.parseSession(value).key.startsWith(`${id}:`)));
         const trashValue=JSON.stringify(record);
         window.PilhaReadingModel.parseTrash(trashValue,id,window.PilhaPersonal);
         state.trash[id]=trashValue;
         delete state.customOrders[id];delete state.tags[id];
+        for(const key of Object.keys(record.issueRead))delete state.issueRead[key];
         for(const sessionId of Object.keys(record.sessions))delete state.sessions[sessionId];
         for (const field of ['current', 'favoriteOrders', 'queueOrders']) delete state[field][id];
         for (const field of ['read', 'notes', 'completedAt', 'ratings']) for (const key of Object.keys(state[field])) if (key.startsWith(`${id}:`)) delete state[field][key];
@@ -750,6 +757,7 @@
       if ($('#noteDialog').open) $('#noteDialog').close();
       window.PilhaPersonalUI?.close();
       window.PilhaExtras?.closePrivate();
+      window.PilhaIssueUI?.close();
       Object.keys(state).forEach(key => delete state[key]);
       Object.assign(state, accountMemory.has(accountId) ? JSON.parse(JSON.stringify(accountMemory.get(accountId))) : load());
       refreshOrders();
@@ -761,7 +769,7 @@
     applyCloud(progress) {
       const incoming = validateProgress(progress);
       // Selection and external-backup dates belong to this device.
-      for (const field of ['read', 'current', 'notes', 'favoriteOrders', 'queueOrders', 'completedAt', 'customOrders', 'profile', 'ratings', 'goals', 'trash', 'tags', 'sessions']) state[field] = incoming[field];
+      for (const field of ['read', 'current', 'notes', 'favoriteOrders', 'queueOrders', 'completedAt', 'customOrders', 'profile', 'ratings', 'goals', 'trash', 'tags', 'sessions', 'issueRead']) state[field] = incoming[field];
       refreshOrders();
       if (!orders.some(order => order.id === selected)) selected = orders[0]?.id;
       applyingRemote = true;
