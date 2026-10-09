@@ -54,6 +54,7 @@ Mover arquivos do site não muda as chaves do armazenamento local nem o endereç
 
 ## Versões preservadas
 
+- Antes do refinamento visual das edições: tag `backup/pre-refino-visual-211e483`.
 - Antes das edições individuais e marcações cruzadas: tag `backup/pre-edicoes-cruzadas-14f7b63`.
 - Antes de releituras, tags e links públicos: tag `backup/pre-releituras-links-c3a4329`.
 - Antes dos perfis: tag `backup/pre-perfis-80da19a`.

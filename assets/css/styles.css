@@ -8,5 +8,33 @@ main{min-width:0}.overview-strip{padding:17px 40px;display:flex;align-items:cent
 @media(max-width:420px){.brand small{display:none}.brand{font-size:18px;gap:8px}.brand-mark{width:32px;height:34px;font-size:22px}.topbar{padding:0 12px}.top-actions .icon-button{padding:8px 9px}.restore-button{font-size:11px}.order-intro,.content,.current-section{padding-left:16px;padding-right:16px}.toolbar{flex-wrap:wrap}.search{flex-basis:100%}.era-picker{width:100%}.order-title-row h1{font-size:40px}.reading-heading h2{font-size:17px}.reading-resume .next-unread{width:100%}.reading-resume>div{min-width:100%}.shelf-tab{font-size:12px}.shelf-tab span{margin-left:3px}.filter-row{gap:6px}.filter{padding:6px 9px}.source-link{font-size:11px}.note-dialog{padding:20px}.note-dialog-actions button{padding:9px 10px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important;animation:none!important}}
 /* Compact reading workspace: keep the first checklist in view. */
+/* Visual finish: retain the existing layout and character accent colours. */
+.topbar{box-shadow:0 5px 22px #0000001c}
+.brand-mark{box-shadow:inset 0 1px 0 #ffffff52,0 3px 12px #00000026}
+.workspace-link,.nav-button{transition:background .18s,color .18s,box-shadow .18s}
+.workspace-link.active{box-shadow:inset 3px 0 0 #e2c16b}
+.nav-button.active{box-shadow:inset 2px 0 0 var(--red)}
+.overview-strip{background:linear-gradient(90deg,#ffffff03,transparent)}
+.overview-strip b{font-variant-numeric:tabular-nums}
+.order-intro .bar{height:4px;background:#292e35}
+.reading-resume{border-radius:12px;box-shadow:0 4px 18px #00000012}
+.next-unread,.dialog-primary{box-shadow:inset 0 1px 0 #ffffff20,0 3px 8px #0000001a}
+.reading-group{border-color:#333942;border-radius:12px;background:linear-gradient(120deg,#1b1e22,#171a1e);box-shadow:0 3px 14px #00000016}
+.reading-group.group-partial{border-color:rgb(var(--theme-rgb) / .25)}
+.reading-group.group-complete{border-color:#43533e}
+.comic-row{padding-top:19px;padding-bottom:19px}
+.comic-title{letter-spacing:.05px}
+.comic-details{color:#aeb6c4}
+.companion-row{background:#14181d;border-top-color:#2d333d;border-left-color:#414b57}
+.group-details>summary{background:#14181c;color:#b3bfce;min-height:42px}
+.group-details>summary>span{font-size:11px}
+.check{border-color:#758090;transition:background .15s,border-color .15s}
+.check:indeterminate{border-color:var(--red);background:rgb(var(--theme-rgb) / .12)}
+.check:indeterminate:after{content:'−';color:var(--red);font-weight:700;line-height:1}
+.row-actions .group-toggle{border-color:#36404b;background:#1d242c;padding:5px 9px}
+.row-actions .group-toggle:hover{border-color:rgb(var(--theme-rgb) / .5);color:var(--red)}
+.row-actions .note-btn:hover,.row-actions .current-btn:hover{border-color:#3d4856}
+.filter.active{border-color:rgb(var(--theme-rgb) / .3);background:rgb(var(--theme-rgb) / .08);color:var(--red)}
+@media(max-width:800px){.comic-row{padding-top:16px;padding-bottom:16px}.reading-group{border-radius:10px}}
 .shelf-tabs{flex-wrap:wrap}
 @media(min-width:801px){.topbar{height:72px}.sidebar{top:72px;height:calc(100dvh - 72px)}.overview-strip{padding-top:13px;padding-bottom:13px}.order-intro{padding-top:25px}.order-title-row{margin-top:12px}.order-title-row h1{font-size:56px}.order-subtitle{margin-top:8px}.order-progress{margin-top:21px}.reading-resume{margin-top:18px;padding-top:14px;padding-bottom:14px}.content{padding-top:23px}.reading-heading{margin-bottom:14px}.filter-row{margin-top:12px;padding-bottom:12px}.section-block{margin-top:20px}}

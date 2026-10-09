@@ -1,6 +1,6 @@
 {
   "name": "minha-pilha",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "private": true,
   "description": "Biblioteca pessoal de comics e mangás, publicada no GitHub Pages.",
   "scripts": {
